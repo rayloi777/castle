@@ -1,11 +1,12 @@
 /*
  * CastleDB Browser Application
- * Full-featured browser-compatible version for sheet editing
+ * Full-featured browser-compatible version with all bug fixes and features
  */
 
 import cdb.Database;
 import cdb.Data;
 import cdb.Sheet;
+import cdb.Types.Guid;
 
 @:expose
 class CastleDBApp {
@@ -13,9 +14,12 @@ class CastleDBApp {
     static var db: Database;
     static var currentSheet: String;
     static var selectedRow: Int = -1;
-    static var history: Array<{d: String, o: String}> = [];
+    static var selectedCol: Int = -1;
+    static var history: Array<{d: String, o: String, sheet: String, filter: String}> = [];
     static var historyIndex: Int = -1;
     static var clipboard: Dynamic = null;
+    static var currentFilter: String = null;
+    static var subSheetData: {sheetName: String, rowIndex: Int, colIndex: Int, subSheet: Sheet, parentSheet: Sheet, parentRow: Dynamic} = null;
     
     public static function init() {
         untyped __js__('
@@ -25,14 +29,35 @@ class CastleDBApp {
                     case "s": e.preventDefault(); if(typeof saveFile === "function") saveFile(); break;
                     case "z": e.preventDefault(); undo(); break;
                     case "y": e.preventDefault(); redo(); break;
+                    case "f": e.preventDefault(); document.getElementById("search-input").focus(); break;
+                    case "c": if (!window.getSelection().toString()) CastleDBApp.copyRow(selectedRow); break;
+                    case "v": if (!window.getSelection().toString()) CastleDBApp.pasteRow(selectedRow); break;
                 }
             }
-            if (e.key === "Delete" && selectedRow >= 0) {
+            if (e.key === "Delete" && selectedRow >= 0 && !window.getSelection().toString()) {
                 e.preventDefault();
-                if(typeof deleteSelectedRow === "function") deleteSelectedRow();
+                deleteRow(selectedRow);
+            }
+            if (e.key === "Escape") {
+                CastleDBApp.clearSelection();
             }
         });
         ');
+    }
+    
+    // ==================== Selection ====================
+    
+    @:expose
+    public static function clearSelection(): Void {
+        selectedRow = -1;
+        selectedCol = -1;
+        untyped __js__("$('#table-body tr').removeClass('selected');");
+        untyped __js__("$('.context-menu').hide();");
+        closeModalIfOpen();
+    }
+    
+    static function closeModalIfOpen(): Void {
+        untyped __js__("if ($('#modal-container').html()) { closeModal(); }");
     }
     
     // ==================== File Operations ====================
@@ -44,6 +69,8 @@ class CastleDBApp {
             currentSheet = db.sheets.length > 0 ? db.sheets[0].name : null;
             history = [];
             historyIndex = -1;
+            currentFilter = null;
+            saveState();
             renderUI();
         } catch(e: Dynamic) {
             trace("Error loading CDB: " + e);
@@ -77,6 +104,9 @@ class CastleDBApp {
     
     public static function setCurrentSheet(name: String): Void {
         currentSheet = name;
+        currentFilter = null;
+        selectedRow = -1;
+        selectedCol = -1;
         renderUI();
     }
     
@@ -86,6 +116,8 @@ class CastleDBApp {
         currentSheet = "Sheet1";
         history = [];
         historyIndex = -1;
+        currentFilter = null;
+        saveState();
         renderUI();
     }
     
@@ -99,7 +131,9 @@ class CastleDBApp {
     public static function saveState(): Void {
         var sdata = {
             d: db.save(),
-            o: haxe.Serializer.run(getOpenedState())
+            o: haxe.Serializer.run(getOpenedState()),
+            sheet: currentSheet,
+            filter: currentFilter
         };
         if (historyIndex < history.length - 1) {
             history = history.slice(0, historyIndex + 1);
@@ -120,6 +154,7 @@ class CastleDBApp {
         return opened;
     }
     
+    @:expose
     public static function undo(): Void {
         if (historyIndex > 0) {
             historyIndex--;
@@ -127,6 +162,7 @@ class CastleDBApp {
         }
     }
     
+    @:expose
     public static function redo(): Void {
         if (historyIndex < history.length - 1) {
             historyIndex++;
@@ -142,13 +178,18 @@ class CastleDBApp {
         return historyIndex < history.length - 1;
     }
     
-    static function restoreState(state: {d: String, o: String}): Void {
+    static function restoreState(state: {d: String, o: String, sheet: String, filter: String}): Void {
         db.loadData(cdb.Parser.parse(state.d, true));
+        currentSheet = state.sheet;
+        currentFilter = state.filter;
+        selectedRow = -1;
+        selectedCol = -1;
         renderUI();
     }
     
     // ==================== Sheet Management ====================
     
+    @:expose
     public static function createSheet(name: String): Bool {
         if (db == null || name == null || name == "") return false;
         for (sheet in db.sheets) {
@@ -161,10 +202,13 @@ class CastleDBApp {
         return true;
     }
     
+    @:expose
     public static function deleteSheet(name: String): Bool {
         if (db == null) return false;
         var sheet = db.getSheet(name);
         if (sheet == null) return false;
+        if (db.sheets.length <= 1) return false;
+        
         saveState();
         @:privateAccess db.data.sheets.remove(sheet.sheet);
         @:privateAccess db.sheets.remove(sheet);
@@ -176,6 +220,7 @@ class CastleDBApp {
         return true;
     }
     
+    @:expose
     public static function renameSheet(oldName: String, newName: String): Bool {
         if (db == null || newName == null || newName == "") return false;
         var sheet = db.getSheet(oldName);
@@ -191,11 +236,31 @@ class CastleDBApp {
         return true;
     }
     
+    @:expose
+    public static function moveSheet(name: String, delta: Int): Bool {
+        if (db == null) return false;
+        var sheet = db.getSheet(name);
+        if (sheet == null) return false;
+        
+        var idx = db.sheets.indexOf(sheet);
+        var newIdx = idx + delta;
+        if (newIdx < 0 || newIdx >= db.sheets.length) return false;
+        
+        saveState();
+        @:privateAccess db.data.sheets.remove(sheet.sheet);
+        @:privateAccess db.sheets.remove(sheet);
+        @:privateAccess db.data.sheets.insert(newIdx, sheet.sheet);
+        @:privateAccess db.sheets.insert(newIdx, sheet);
+        db.sync();
+        renderUI();
+        return true;
+    }
+    
     public static function getSheetNames(): Array<String> {
         if (db == null) return [];
         var names = [];
         for (sheet in db.sheets) {
-            if (!sheet.props.hide) {
+            if (sheet.props == null || !sheet.props.hide) {
                 names.push(sheet.name);
             }
         }
@@ -204,6 +269,7 @@ class CastleDBApp {
     
     // ==================== Column Management ====================
     
+    @:expose
     public static function createColumn(sheetName: String, colData: Dynamic): Bool {
         var sheet = db.getSheet(sheetName);
         if (sheet == null) return false;
@@ -215,31 +281,49 @@ class CastleDBApp {
             name: colData.name,
             type: colType,
             typeStr: getTypeString(colType, colData),
-            opt: colData.opt
+            opt: colData.opt == true
         });
         db.sync();
         renderUI();
         return true;
     }
     
-    static function getTypeString(type: ColumnType, colData: Dynamic): String {
-        return switch(type) {
-            case TInt: "3";
-            case TFloat: "4";
-            case TBool: "2";
-            case TColor: "11";
-            case TFile: "13";
-            case TImage: "7";
-            case TList: "8";
-            case TProperties: "17";
-            case TGuid: "20";
-            case TRef(s): "6:" + s;
-            case TEnum(values): "5:" + values.join(",");
-            case TFlags(values): "10:" + values.join(",");
-            default: "1";
+    @:expose
+    public static function editColumn(sheetName: String, colIndex: Int, colData: Dynamic): Bool {
+        var sheet = db.getSheet(sheetName);
+        if (sheet == null || colIndex < 0 || colIndex >= sheet.columns.length) return false;
+        
+        var colType: ColumnType = parseColumnType(colData.type, colData);
+        var oldCol = sheet.columns[colIndex];
+        
+        saveState();
+        
+        var newCol: Column = {
+            name: colData.name,
+            type: colType,
+            typeStr: getTypeString(colType, colData),
+            opt: colData.opt == true
+        };
+        
+        if (oldCol.display != null) newCol.display = oldCol.display;
+        if (oldCol.kind != null) newCol.kind = oldCol.kind;
+        if (oldCol.documentation != null) newCol.documentation = oldCol.documentation;
+        
+        if (oldCol.name != colData.name) {
+            for (line in sheet.lines) {
+                var val = Reflect.field(line, oldCol.name);
+                Reflect.deleteField(line, oldCol.name);
+                Reflect.setField(line, colData.name, val);
+            }
         }
+        
+        @:privateAccess sheet.sheet.columns[colIndex] = newCol;
+        db.sync();
+        renderUI();
+        return true;
     }
     
+    @:expose
     public static function deleteColumn(sheetName: String, colIndex: Int): Bool {
         var sheet = db.getSheet(sheetName);
         if (sheet == null || colIndex < 0 || colIndex >= sheet.columns.length) return false;
@@ -257,51 +341,188 @@ class CastleDBApp {
         return true;
     }
     
-    static function parseColumnType(typeStr: String, colData: Dynamic): ColumnType {
-        return switch(typeStr) {
-            case "string": TString;
-            case "int": TInt;
-            case "float": TFloat;
-            case "bool": TBool;
-            case "color": TColor;
-            case "file": TFile;
-            case "image": TImage;
-            case "list": TList;
-            case "properties": TProperties;
-            case "guid": TGuid;
-            case "ref": TRef(colData.refSheet != null ? colData.refSheet : "");
-            case "enum": TEnum(colData.enumValues != null ? colData.enumValues.split(",").map(StringTools.trim) : []);
-            case "flags": TFlags(colData.flagsValues != null ? colData.flagsValues.split(",").map(StringTools.trim) : []);
-            default: TString;
+    @:expose
+    public static function moveColumn(sheetName: String, colIndex: Int, delta: Int): Bool {
+        var sheet = db.getSheet(sheetName);
+        if (sheet == null || colIndex < 0 || colIndex >= sheet.columns.length) return false;
+        
+        var newIdx = colIndex + delta;
+        if (newIdx < 0 || newIdx >= sheet.columns.length) return false;
+        
+        saveState();
+        var col = sheet.columns[colIndex];
+        @:privateAccess sheet.sheet.columns.splice(colIndex, 1);
+        @:privateAccess sheet.sheet.columns.insert(newIdx, col);
+        db.sync();
+        renderUI();
+        return true;
+    }
+    
+    @:expose
+    public static function setDisplayColumn(sheetName: String, colName: String): Void {
+        var sheet = db.getSheet(sheetName);
+        if (sheet == null) return;
+        saveState();
+        if (sheet.props.displayColumn == colName) {
+            sheet.props.displayColumn = null;
+        } else {
+            sheet.props.displayColumn = colName;
         }
+        db.sync();
+        renderUI();
+    }
+    
+    @:expose
+    public static function setDisplayIcon(sheetName: String, colName: String): Void {
+        var sheet = db.getSheet(sheetName);
+        if (sheet == null) return;
+        saveState();
+        if (sheet.props.displayIcon == colName) {
+            sheet.props.displayIcon = null;
+        } else {
+            sheet.props.displayIcon = colName;
+        }
+        db.sync();
+        renderUI();
+    }
+    
+    @:expose
+    public static function getColumnInfo(sheetName: String, colIndex: Int): Dynamic {
+        var sheet = db.getSheet(sheetName);
+        if (sheet == null || colIndex < 0 || colIndex >= sheet.columns.length) return null;
+        
+        var col = sheet.columns[colIndex];
+        var info: Dynamic = {
+            name: col.name,
+            type: getTypeId(col.type),
+            opt: col.opt == true,
+            displayColumn: sheet.props.displayColumn == col.name,
+            displayIcon: sheet.props.displayIcon == col.name
+        };
+        
+        switch(col.type) {
+            case TEnum(values): info.enumValues = values.join(",");
+            case TFlags(values): info.flagsValues = values.join(",");
+            case TRef(s): info.refSheet = s;
+            default:
+        }
+        
+        return info;
+    }
+    
+    @:expose
+    public static function getColumnNames(sheetName: String): Array<String> {
+        var sheet = db.getSheet(sheetName);
+        if (sheet == null) return [];
+        return [for (c in sheet.columns) c.name];
+    }
+    
+    @:expose
+    public static function convertColumn(sheetName: String, colIndex: Int, conversionType: String): Bool {
+        var sheet = db.getSheet(sheetName);
+        if (sheet == null || colIndex < 0 || colIndex >= sheet.columns.length) return false;
+        
+        var col = sheet.columns[colIndex];
+        saveState();
+        
+        switch(conversionType) {
+            case "lower":
+                for (line in sheet.lines) {
+                    var val: String = Reflect.field(line, col.name);
+                    if (val != null) Reflect.setField(line, col.name, val.toLowerCase());
+                }
+            case "upper":
+                for (line in sheet.lines) {
+                    var val: String = Reflect.field(line, col.name);
+                    if (val != null) Reflect.setField(line, col.name, val.toUpperCase());
+                }
+            case "title":
+                for (line in sheet.lines) {
+                    var val: String = Reflect.field(line, col.name);
+                    if (val != null && val.length > 0) {
+                        Reflect.setField(line, col.name, val.charAt(0).toUpperCase() + val.substr(1).toLowerCase());
+                    }
+                }
+            case "mul10":
+                for (line in sheet.lines) {
+                    var val: Float = Reflect.field(line, col.name);
+                    if (val != null) Reflect.setField(line, col.name, val * 10);
+                }
+            case "div10":
+                for (line in sheet.lines) {
+                    var val: Float = Reflect.field(line, col.name);
+                    if (val != null) Reflect.setField(line, col.name, val / 10);
+                }
+            case "add1":
+                for (line in sheet.lines) {
+                    var val: Float = Reflect.field(line, col.name);
+                    if (val != null) Reflect.setField(line, col.name, val + 1);
+                }
+            case "sub1":
+                for (line in sheet.lines) {
+                    var val: Float = Reflect.field(line, col.name);
+                    if (val != null) Reflect.setField(line, col.name, val - 1);
+                }
+            default:
+                return false;
+        }
+        
+        renderSheet();
+        return true;
     }
     
     // ==================== Row Management ====================
     
+    @:expose
     public static function addRow(): Void {
         var sheet = getCurrentSheet();
         if (sheet == null) return;
         saveState();
-        @:privateAccess sheet.sheet.lines.push({});
+        var newLine: Dynamic = {};
+        
+        for (col in sheet.columns) {
+            if (col.type.match(TGuid)) {
+                Reflect.setField(newLine, col.name, cdb.Database.genGUID());
+            }
+        }
+        
+        @:privateAccess sheet.sheet.lines.push(newLine);
+        selectedRow = sheet.lines.length - 1;
         renderSheet();
     }
     
+    @:expose
     public static function insertRow(index: Int): Void {
         var sheet = getCurrentSheet();
         if (sheet == null) return;
         saveState();
-        @:privateAccess sheet.sheet.lines.insert(index, {});
+        var newLine: Dynamic = {};
+        
+        for (col in sheet.columns) {
+            if (col.type.match(TGuid)) {
+                Reflect.setField(newLine, col.name, cdb.Database.genGUID());
+            }
+        }
+        
+        @:privateAccess sheet.sheet.lines.insert(index, newLine);
+        selectedRow = index;
         renderSheet();
     }
     
+    @:expose
     public static function deleteRow(index: Int): Void {
         var sheet = getCurrentSheet();
         if (sheet == null) return;
+        
+        if (index < 0 || index >= sheet.lines.length) return;
+        
         saveState();
         @:privateAccess sheet.sheet.lines.splice(index, 1);
+        selectedRow = -1;
         renderSheet();
     }
     
+    @:expose
     public static function moveRow(fromIndex: Int, toIndex: Int): Void {
         var sheet = getCurrentSheet();
         if (sheet == null) return;
@@ -311,44 +532,118 @@ class CastleDBApp {
         var line = sheet.lines[fromIndex];
         @:privateAccess sheet.sheet.lines.splice(fromIndex, 1);
         @:privateAccess sheet.sheet.lines.insert(toIndex, line);
+        selectedRow = toIndex;
         renderSheet();
     }
     
+    @:expose
     public static function duplicateRow(index: Int): Void {
         var sheet = getCurrentSheet();
         if (sheet == null || index < 0 || index >= sheet.lines.length) return;
         saveState();
         var line = sheet.lines[index];
         var copy = Reflect.copy(line);
+        
+        for (col in sheet.columns) {
+            if (col.type.match(TGuid)) {
+                Reflect.setField(copy, col.name, cdb.Database.genGUID());
+            }
+        }
+        
         @:privateAccess sheet.sheet.lines.insert(index + 1, copy);
+        selectedRow = index + 1;
         renderSheet();
     }
     
+    @:expose
     public static function copyRow(index: Int): Void {
         var sheet = getCurrentSheet();
         if (sheet == null || index < 0 || index >= sheet.lines.length) return;
         clipboard = Reflect.copy(sheet.lines[index]);
     }
     
+    @:expose
     public static function pasteRow(index: Int): Void {
         var sheet = getCurrentSheet();
         if (sheet == null || clipboard == null) return;
         saveState();
         var pasteCopy = Reflect.copy(clipboard);
+        
+        for (col in sheet.columns) {
+            if (col.type.match(TGuid)) {
+                Reflect.setField(pasteCopy, col.name, cdb.Database.genGUID());
+            }
+        }
+        
         if (index >= 0 && index < sheet.lines.length) {
             @:privateAccess sheet.sheet.lines.insert(index + 1, pasteCopy);
+            selectedRow = index + 1;
         } else {
             @:privateAccess sheet.sheet.lines.push(pasteCopy);
+            selectedRow = sheet.lines.length - 1;
         }
         renderSheet();
     }
     
+    @:expose
     public static function hasClipboard(): Bool {
         return clipboard != null;
     }
     
+    // ==================== Separator Management ====================
+    
+    @:expose
+    public static function toggleSeparator(index: Int): Void {
+        var sheet = getCurrentSheet();
+        if (sheet == null) return;
+        
+        saveState();
+        
+        var sepIndex = -1;
+        for (i in 0...sheet.separators.length) {
+            if (sheet.separators[i].index == index) {
+                sepIndex = i;
+                break;
+            }
+        }
+        
+        if (sepIndex >= 0) {
+            sheet.separators.splice(sepIndex, 1);
+        } else {
+            sheet.separators.push({ index: index });
+            sheet.separators.sort(function(a, b) return a.index - b.index);
+        }
+        
+        @:privateAccess sheet.sheet.separators = sheet.separators;
+        renderSheet();
+    }
+    
+    @:expose
+    public static function setSeparatorTitle(index: Int, title: String): Void {
+        var sheet = getCurrentSheet();
+        if (sheet == null) return;
+        
+        saveState();
+        
+        var sepIndex = -1;
+        for (i in 0...sheet.separators.length) {
+            if (sheet.separators[i].index == index) {
+                sepIndex = i;
+                break;
+            }
+        }
+        
+        if (sepIndex >= 0) {
+            sheet.separators[sepIndex].title = title;
+        }
+        
+        @:privateAccess sheet.sheet.separators = sheet.separators;
+        renderSheet();
+    }
+    
     // ==================== Cell Editing ====================
     
+    @:expose
     public static function updateCell(rowIndex: Int, colIndex: Int, value: Dynamic): Void {
         var sheet = getCurrentSheet();
         if (sheet == null) return;
@@ -364,17 +659,370 @@ class CastleDBApp {
             var converted: Dynamic = value;
             switch (col.type) {
                 case TInt:
-                    converted = Std.parseInt(Std.string(value));
-                    if (Math.isNaN(converted)) converted = 0;
+                    var parsed = Std.parseInt(Std.string(value));
+                    if (parsed == null) parsed = 0;
+                    converted = parsed;
                 case TFloat:
-                    converted = Std.parseFloat(Std.string(value));
-                    if (Math.isNaN(converted)) converted = 0.0;
+                    var parsed = Std.parseFloat(Std.string(value));
+                    if (Math.isNaN(parsed)) parsed = 0.0;
+                    converted = parsed;
                 case TBool:
                     converted = value == true || value == "true" || value == "1" || value == 1;
+                case TColor:
+                    var hex = Std.string(value);
+                    if (StringTools.startsWith(hex, "#")) hex = hex.substr(1);
+                    if (hex.length == 6) {
+                        hex = "FF" + hex;
+                    }
+                    if (hex.length == 8) {
+                        var r = Std.parseInt("0x" + hex.substr(2, 2));
+                        var g = Std.parseInt("0x" + hex.substr(4, 2));
+                        var b = Std.parseInt("0x" + hex.substr(6, 2));
+                        var a = Std.parseInt("0x" + hex.substr(0, 2));
+                        if (r != null && g != null && b != null && a != null) {
+                            converted = (a << 24) | (r << 16) | (g << 8) | b;
+                        } else {
+                            converted = 0xFF000000;
+                        }
+                    } else {
+                        converted = 0xFF000000;
+                    }
                 default:
                     converted = value;
             }
             Reflect.setField(line, col.name, converted);
+        }
+        
+        renderSheet();
+    }
+    
+    // ==================== Search/Filter ====================
+    
+    @:expose
+    public static function setFilter(filter: String): Void {
+        currentFilter = filter != null && filter.length > 0 ? filter.toLowerCase() : null;
+        selectedRow = -1;
+        renderSheet();
+    }
+    
+    static function matchesFilter(line: Dynamic, columns: Array<Column>): Bool {
+        if (currentFilter == null) return true;
+        for (col in columns) {
+            var val = Reflect.field(line, col.name);
+            if (val != null && Std.string(val).toLowerCase().indexOf(currentFilter) >= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    // ==================== Sub-sheet Editing ====================
+    
+    @:expose
+    public static function openSubSheet(rowIndex: Int, colIndex: Int): Dynamic {
+        var sheet = getCurrentSheet();
+        if (sheet == null) return null;
+        
+        var col = sheet.columns[colIndex];
+        var line = sheet.lines[rowIndex];
+        var val = line != null ? Reflect.field(line, col.name) : null;
+        
+        var subSheetName = sheet.name + "@" + col.name;
+        var subSheet = db.getSheet(subSheetName);
+        
+        subSheetData = {
+            sheetName: sheet.name,
+            rowIndex: rowIndex,
+            colIndex: colIndex,
+            subSheet: subSheet,
+            parentSheet: sheet,
+            parentRow: line
+        };
+        
+        return {
+            parentSheet: sheet.name,
+            columnName: col.name,
+            columnType: getTypeId(col.type),
+            subSheetName: subSheet != null ? subSheet.name : null,
+            data: val,
+            columns: subSheet != null ? [for (c in subSheet.columns) {name: c.name, type: getTypeId(c.type), opt: c.opt}] : []
+        };
+    }
+    
+    @:expose
+    public static function getSubSheetData(): Dynamic {
+        if (subSheetData == null || subSheetData.subSheet == null) return null;
+        
+        var sub = subSheetData.subSheet;
+        return {
+            columns: [for (c in sub.columns) {name: c.name, type: getTypeId(c.type), opt: c.opt}],
+            lines: sub.lines
+        };
+    }
+    
+    @:expose
+    public static function updateSubSheetCell(lineIndex: Int, colName: String, value: Dynamic): Void {
+        if (subSheetData == null || subSheetData.subSheet == null) return;
+        
+        saveState();
+        var line = subSheetData.subSheet.lines[lineIndex];
+        if (line == null) return;
+        
+        if (value == null || value == "") {
+            Reflect.deleteField(line, colName);
+        } else {
+            Reflect.setField(line, colName, value);
+        }
+    }
+    
+    @:expose
+    public static function addSubSheetRow(): Void {
+        if (subSheetData == null || subSheetData.subSheet == null) return;
+        saveState();
+        @:privateAccess subSheetData.subSheet.sheet.lines.push({});
+    }
+    
+    @:expose
+    public static function deleteSubSheetRow(index: Int): Void {
+        if (subSheetData == null || subSheetData.subSheet == null) return;
+        saveState();
+        @:privateAccess subSheetData.subSheet.sheet.lines.splice(index, 1);
+    }
+    
+    @:expose
+    public static function closeSubSheet(): Void {
+        if (subSheetData != null && subSheetData.parentRow != null) {
+            var col = subSheetData.parentSheet.columns[subSheetData.colIndex];
+            var sub = subSheetData.subSheet;
+            if (sub != null) {
+                Reflect.setField(subSheetData.parentRow, col.name, sub.lines);
+            }
+        }
+        subSheetData = null;
+    }
+    
+    // ==================== Gradient Editing ====================
+    
+    @:expose
+    public static function openGradientEditor(rowIndex: Int, colIndex: Int): Dynamic {
+        var sheet = getCurrentSheet();
+        if (sheet == null) return null;
+        
+        var col = sheet.columns[colIndex];
+        var line = sheet.lines[rowIndex];
+        var val: Dynamic = Reflect.field(line, col.name);
+        
+        if (val == null) {
+            val = { colors: [0xFF0000, 0x00FF00, 0x0000FF], positions: [0.0, 0.5, 1.0] };
+        }
+        
+        return {
+            colors: val.colors != null ? val.colors : [],
+            positions: val.positions != null ? val.positions : []
+        };
+    }
+    
+    @:expose
+    public static function saveGradient(rowIndex: Int, colIndex: Int, colors: Array<Int>, positions: Array<Float>): Void {
+        var sheet = getCurrentSheet();
+        if (sheet == null) return;
+        
+        var col = sheet.columns[colIndex];
+        var line = sheet.lines[rowIndex];
+        
+        saveState();
+        Reflect.setField(line, col.name, { colors: colors, positions: positions });
+        renderSheet();
+    }
+    
+    // ==================== Curve Editing ====================
+    
+    @:expose
+    public static function openCurveEditor(rowIndex: Int, colIndex: Int): Dynamic {
+        var sheet = getCurrentSheet();
+        if (sheet == null) return null;
+        
+        var col = sheet.columns[colIndex];
+        var line = sheet.lines[rowIndex];
+        var val = Reflect.field(line, col.name);
+        
+        if (val == null) {
+            val = [];
+        }
+        
+        return { points: val };
+    }
+    
+    @:expose
+    public static function saveCurve(rowIndex: Int, colIndex: Int, points: Array<Float>): Void {
+        var sheet = getCurrentSheet();
+        if (sheet == null) return;
+        
+        var col = sheet.columns[colIndex];
+        var line = sheet.lines[rowIndex];
+        
+        saveState();
+        Reflect.setField(line, col.name, points);
+        renderSheet();
+    }
+    
+    // ==================== Reference Validation ====================
+    
+    public static function validateReference(sheetName: String, colIndex: Int): {valid: Bool, message: String} {
+        var sheet = db.getSheet(sheetName);
+        if (sheet == null || colIndex < 0 || colIndex >= sheet.columns.length) {
+            return {valid: false, message: "Invalid sheet or column"};
+        }
+        
+        var col = sheet.columns[colIndex];
+        switch(col.type) {
+            case TRef(refSheet):
+                var refSheetObj = db.getSheet(refSheet);
+                if (refSheetObj == null) {
+                    return {valid: false, message: "Referenced sheet not found: " + refSheet};
+                }
+                
+                var idCol: String = null;
+                for (c in refSheetObj.columns) {
+                    if (c.type.match(TId)) {
+                        idCol = c.name;
+                        break;
+                    }
+                }
+                
+                if (idCol == null) {
+                    return {valid: true, message: null};
+                }
+                
+                var validIds = new Map<String, Bool>();
+                for (line in refSheetObj.lines) {
+                    var id: String = Reflect.field(line, idCol);
+                    if (id != null) validIds.set(id, true);
+                }
+                
+                var invalidCount = 0;
+                for (line in sheet.lines) {
+                    var val: String = Reflect.field(line, col.name);
+                    if (val != null && val != "" && !validIds.exists(val)) {
+                        invalidCount++;
+                    }
+                }
+                
+                if (invalidCount > 0) {
+                    return {valid: false, message: invalidCount + " broken reference(s)"};
+                }
+                return {valid: true, message: null};
+            default:
+                return {valid: true, message: null};
+        }
+    }
+    
+    @:expose
+    public static function getRowReferences(sheetName: String, rowIndex: Int): Array<{sheet: String, column: String, row: Int}> {
+        var refs: Array<{sheet: String, column: String, row: Int}> = [];
+        
+        var sheet = db.getSheet(sheetName);
+        if (sheet == null || rowIndex < 0 || rowIndex >= sheet.lines.length) return refs;
+        
+        var line = sheet.lines[rowIndex];
+        var idCol: String = null;
+        var idVal: String = null;
+        
+        for (col in sheet.columns) {
+            if (col.type.match(TId)) {
+                idCol = col.name;
+                idVal = Reflect.field(line, col.name);
+                break;
+            }
+        }
+        
+        if (idVal == null) return refs;
+        
+        for (s in db.sheets) {
+            for (c in s.columns) {
+                switch(c.type) {
+                    case TRef(refSheetName):
+                        if (refSheetName == sheetName) {
+                            for (i in 0...s.lines.length) {
+                                var val: String = Reflect.field(s.lines[i], c.name);
+                                if (val == idVal) {
+                                    refs.push({sheet: s.name, column: c.name, row: i});
+                                }
+                            }
+                        }
+                    default:
+                }
+            }
+        }
+        
+        return refs;
+    }
+    
+    // ==================== Type Helpers ====================
+    
+    static function getTypeId(type: ColumnType): String {
+        return switch(type) {
+            case TId: "id";
+            case TInt: "int";
+            case TFloat: "float";
+            case TBool: "bool";
+            case TColor: "color";
+            case TFile: "file";
+            case TImage: "image";
+            case TList: "list";
+            case TProperties: "properties";
+            case TGuid: "guid";
+            case TRef(_): "ref";
+            case TEnum(_): "enum";
+            case TFlags(_): "flags";
+            case TGradient: "gradient";
+            case TCurve: "curve";
+            case TDynamic: "dynamic";
+            default: "string";
+        }
+    }
+    
+    static function getTypeString(type: ColumnType, colData: Dynamic): String {
+        return switch(type) {
+            case TInt: "3";
+            case TFloat: "4";
+            case TBool: "2";
+            case TColor: "11";
+            case TFile: "13";
+            case TImage: "7";
+            case TList: "8";
+            case TProperties: "17";
+            case TGuid: "20";
+            case TId: "0";
+            case TRef(s): "6:" + s;
+            case TEnum(values): "5:" + values.join(",");
+            case TFlags(values): "10:" + values.join(",");
+            case TGradient: "18";
+            case TCurve: "19";
+            default: "1";
+        }
+    }
+    
+    static function parseColumnType(typeStr: String, colData: Dynamic): ColumnType {
+        return switch(typeStr) {
+            case "id": TId;
+            case "string": TString;
+            case "int": TInt;
+            case "float": TFloat;
+            case "bool": TBool;
+            case "color": TColor;
+            case "file": TFile;
+            case "image": TImage;
+            case "list": TList;
+            case "properties": TProperties;
+            case "guid": TGuid;
+            case "gradient": TGradient;
+            case "curve": TCurve;
+            case "dynamic": TDynamic;
+            case "ref": TRef(colData.refSheet != null ? colData.refSheet : "");
+            case "enum": TEnum(colData.enumValues != null ? colData.enumValues.split(",").map(StringTools.trim) : []);
+            case "flags": TFlags(colData.flagsValues != null ? colData.flagsValues.split(",").map(StringTools.trim) : []);
+            default: TString;
         }
     }
     
@@ -384,24 +1032,7 @@ class CastleDBApp {
         var sheet = db.getSheet(sheetName);
         if (sheet == null) return [];
         
-        var options = [];
-        var idCol = null;
-        var nameCol = null;
-        
-        for (col in sheet.columns) {
-            if (col.type.match(TId)) idCol = col.name;
-            if (col.type.match(TString) && nameCol == null) nameCol = col.name;
-        }
-        
-        for (line in sheet.lines) {
-            var id = idCol != null ? Reflect.field(line, idCol) : null;
-            var name = nameCol != null ? Reflect.field(line, nameCol) : null;
-            if (id != null) {
-                options.push({ id: id, name: name != null ? name : id });
-            }
-        }
-        
-        return options;
+        return [for (si in sheet.all) { id: si.id, name: si.disp }];
     }
     
     // ==================== Rendering ====================
@@ -410,10 +1041,14 @@ class CastleDBApp {
         if (db == null) return;
         
         var tabsHtml = "";
-        for (sheet in db.sheets) {
-            if (sheet.props != null && !sheet.props.hide) {
+        var sheetIndex = 0;
+        for (i in 0...db.sheets.length) {
+            var sheet = db.sheets[i];
+            if (sheet.props == null || !sheet.props.hide) {
                 var active = sheet.name == currentSheet ? " active" : "";
-                tabsHtml += "<div class='tab" + active + "' onclick='CastleDBApp.setCurrentSheet(\"" + sheet.name + "\")'>" + sheet.name + "</div>";
+                var icon = sheet.props.displayColumn != null ? getDisplayIcon(sheet) : "";
+                tabsHtml += "<div class='tab" + active + "' data-sheet='" + sheet.name + "' data-index='" + sheetIndex + "' onclick='CastleDBApp.setCurrentSheet(\"" + sheet.name + "\")' oncontextmenu='showSheetContextMenu(event, \"" + sheet.name + "\")'>" + icon + escapeHtml(sheet.name) + "</div>";
+                sheetIndex++;
             }
         }
         untyped $("#sheet-tabs").html(tabsHtml);
@@ -421,6 +1056,16 @@ class CastleDBApp {
         renderSheet();
         untyped $("#welcome").hide();
         untyped $("#content").show();
+    }
+    
+    static function getDisplayIcon(sheet: Sheet): String {
+        if (sheet.props.displayIcon == null) return "";
+        for (col in sheet.columns) {
+            if (col.name == sheet.props.displayIcon) {
+                return "[ICON] ";
+            }
+        }
+        return "";
     }
     
     public static function renderSheet(): Void {
@@ -452,37 +1097,97 @@ class CastleDBApp {
                 case TList: "list";
                 case TProperties: "props";
                 case TGuid: "guid";
+                case TId: "id";
+                case TGradient: "gradient";
+                case TCurve: "curve";
+                case TDynamic: "dynamic";
                 default: "string";
             }
             var optLabel = col.opt ? " (opt)" : "";
-            headHtml += "<th>" + col.name + " <span style='color:#888;font-size:11px'>" + typeLabel + optLabel + "</span></th>";
+            var dispMark = sheet.props.displayColumn == col.name ? " ★" : "";
+            var iconMark = sheet.props.displayIcon == col.name ? " ⬡" : "";
+            var validation = validateReference(sheet.name, i);
+            var errorClass = !validation.valid ? " style='color:red;'" : "";
+            headHtml += "<th data-col='" + i + "' oncontextmenu='showColumnContextMenu(event, " + i + ")'" + errorClass + ">" + escapeHtml(col.name) + " <span style='color:#888;font-size:11px'>" + typeLabel + optLabel + dispMark + iconMark + "</span></th>";
         }
         headHtml += "</tr>";
         untyped $("#table-head").html(headHtml);
         
         var bodyHtml = "";
+        var filteredCount = 0;
+        var visibleIndex = 0;
+        
         for (rowIdx in 0...lines.length) {
             var line = lines[rowIdx];
-            bodyHtml += "<tr data-row='" + rowIdx + "'>";
+            
+            var isSeparator = false;
+            for (sep in sheet.separators) {
+                if (sep.index == rowIdx) {
+                    var title = sep.title != null ? sep.title : "";
+                    bodyHtml += "<tr class='separator-row' data-separator='" + rowIdx + "'><td colspan='" + columns.length + "' onclick='CastleDBApp.toggleSeparator(" + rowIdx + ")'>" + escapeHtml(title) + " <span style='color:#888;font-size:10px'>(click to remove)</span></td></tr>";
+                    isSeparator = true;
+                    break;
+                }
+            }
+            
+            if (!matchesFilter(line, columns)) continue;
+            filteredCount++;
+            
+            var selected = rowIdx == selectedRow ? " selected" : "";
+            bodyHtml += "<tr data-row='" + rowIdx + "' data-visible='" + visibleIndex + "' class='data-row" + selected + "'>";
+            
             for (colIdx in 0...columns.length) {
                 var col = columns[colIdx];
                 var val = line != null ? Reflect.field(line, col.name) : null;
-                bodyHtml += renderCell(rowIdx, colIdx, col, val);
+                var isRef = col.type.match(TRef(_));
+                var refValid = isRef ? validateRefValue(col, val) : true;
+                bodyHtml += renderCell(rowIdx, colIdx, col, val, refValid);
             }
             bodyHtml += "</tr>";
+            visibleIndex++;
         }
         untyped $("#table-body").html(bodyHtml);
         
         attachCellHandlers();
         
-        var statusText = lines.length + " rows | " + columns.length + " columns";
-        if (canUndo()) statusText += " | Undo available";
-        if (canRedo()) statusText += " | Redo available";
+        var statusText = lines.length + " rows";
+        if (currentFilter != null) statusText += " (" + filteredCount + " shown)";
+        statusText += " | " + columns.length + " columns";
+        if (canUndo()) statusText += " | Ctrl+Z: Undo";
+        if (canRedo()) statusText += " | Ctrl+Y: Redo";
         untyped $("#status-bar").text(statusText);
     }
     
-    static function renderCell(rowIdx: Int, colIdx: Int, col: Column, val: Dynamic): String {
+    static function validateRefValue(col: Column, val: Dynamic): Bool {
+        if (val == null || val == "") return true;
+        switch(col.type) {
+            case TRef(refSheet):
+                var refSheetObj = db.getSheet(refSheet);
+                if (refSheetObj == null) return false;
+                
+                var idCol: String = null;
+                for (c in refSheetObj.columns) {
+                    if (c.type.match(TId)) {
+                        idCol = c.name;
+                        break;
+                    }
+                }
+                
+                if (idCol == null) return true;
+                
+                for (line in refSheetObj.lines) {
+                    var id: String = Reflect.field(line, idCol);
+                    if (id == val) return true;
+                }
+                return false;
+            default:
+                return true;
+        }
+    }
+    
+    static function renderCell(rowIdx: Int, colIdx: Int, col: Column, val: Dynamic, refValid: Bool = true): String {
         var inputAttrs = "data-row='" + rowIdx + "' data-col='" + colIdx + "'";
+        var errorStyle = refValid ? "" : " style='background:#ffebee;color:#c62828;'";
         
         return switch (col.type) {
             case TBool:
@@ -490,51 +1195,85 @@ class CastleDBApp {
                 "<td><input type='checkbox' class='edit-cell' " + inputAttrs + " " + checked + " /></td>";
             
             case TColor:
-                var colorVal = val != null ? Std.string(val) : "#000000";
-                "<td><input type='color' class='edit-cell color-input' " + inputAttrs + " value='" + colorVal + "' /></td>";
+                var colorHex = "000000";
+                if (val != null) {
+                    var intVal: Int = val;
+                    var r = (intVal >> 16) & 0xFF;
+                    var g = (intVal >> 8) & 0xFF;
+                    var b = intVal & 0xFF;
+                    colorHex = StringTools.hex(r, 2) + StringTools.hex(g, 2) + StringTools.hex(b, 2);
+                }
+                var alphaHex = "FF";
+                if (val != null) {
+                    var a = (val >> 24) & 0xFF;
+                    alphaHex = StringTools.hex(a, 2);
+                }
+                "<td><input type='text' class='edit-cell color-cell' " + inputAttrs + " data-color='" + alphaHex + colorHex + "' value='#" + alphaHex + colorHex + "'" + errorStyle + " /></td>";
             
             case TEnum(values):
-                var html = "<td><select class='edit-cell' " + inputAttrs + ">";
+                var html = "<td><select class='edit-cell' " + inputAttrs + errorStyle + ">";
                 html += "<option value=''>--</option>";
                 for (i in 0...values.length) {
-                    var selected: Dynamic = val;
-                    var sel = (selected == i) ? "selected" : "";
-                    html += "<option value='" + i + "' " + sel + ">" + values[i] + "</option>";
+                    var sel = (val == i) ? "selected" : "";
+                    html += "<option value='" + i + "' " + sel + ">" + escapeHtml(values[i]) + "</option>";
                 }
                 return html + "</select></td>";
             
             case TFlags(values):
-                var html = "<td><div class='flags-cell' " + inputAttrs + ">";
+                var html = "<td><div class='flags-cell' " + inputAttrs + errorStyle + ">";
                 var flagsInt: Dynamic = val != null ? val : 0;
                 for (i in 0...values.length) {
                     var bit = 1 << i;
                     var checked = (flagsInt & bit) != 0 ? "checked" : "";
-                    html += "<label><input type='checkbox' class='edit-cell flag-check' data-flag='" + i + "' " + inputAttrs + " " + checked + " /> " + values[i] + "</label>";
+                    html += "<label><input type='checkbox' class='edit-cell flag-check' data-flag='" + i + "' " + inputAttrs + " " + checked + " /> " + escapeHtml(values[i]) + "</label>";
                 }
                 return html + "</div></td>";
             
             case TRef(refSheet):
-                var html = "<td><select class='edit-cell ref-select' " + inputAttrs + ">";
+                var html = "<td><select class='edit-cell ref-select' " + inputAttrs + errorStyle + ">";
                 html += "<option value=''>--</option>";
                 var options = getReferenceOptions(refSheet);
                 for (opt in options) {
-                    var selected: Dynamic = val;
-                    var sel = (selected == opt.id) ? "selected" : "";
-                    html += "<option value='" + opt.id + "' " + sel + ">" + opt.name + "</option>";
+                    var sel = (val == opt.id) ? "selected" : "";
+                    html += "<option value='" + escapeHtml(opt.id) + "' " + sel + ">" + escapeHtml(opt.name) + "</option>";
                 }
                 return html + "</select></td>";
             
-            case TList, TProperties:
-                var displayVal = val != null ? Std.string(val).substr(0, 30) + "..." : "[empty]";
-                "<td><span class='edit-cell complex-cell' " + inputAttrs + " style='cursor:pointer;color:#4A90D9;'>" + escapeHtml(displayVal) + "</span></td>";
+            case TList:
+                var count = val != null && Std.isOfType(val, Array) ? val.length : 0;
+                var displayVal = "[" + count + " items]";
+                "<td><span class='edit-cell list-cell' " + inputAttrs + " style='cursor:pointer;color:#4A90D9;' onclick='openListEditor(" + rowIdx + ", " + colIdx + ")'>" + displayVal + "</span></td>";
+            
+            case TProperties:
+                var hasProps = val != null && Reflect.fields(val).length > 0;
+                var displayVal = hasProps ? "[" + Reflect.fields(val).length + " props]" : "[empty]";
+                "<td><span class='edit-cell props-cell' " + inputAttrs + " style='cursor:pointer;color:#4A90D9;' onclick='openPropsEditor(" + rowIdx + ", " + colIdx + ")'>" + displayVal + "</span></td>";
+            
+            case TGradient:
+                "<td><span class='edit-cell gradient-cell' " + inputAttrs + " style='cursor:pointer;color:#4A90D9;' onclick='openGradientEditor(" + rowIdx + ", " + colIdx + ")'>[Gradient]</span></td>";
+            
+            case TCurve:
+                "<td><span class='edit-cell curve-cell' " + inputAttrs + " style='cursor:pointer;color:#4A90D9;' onclick='openCurveEditor(" + rowIdx + ", " + colIdx + ")'>[Curve]</span></td>";
             
             case TInt, TFloat:
                 var numVal = val != null ? Std.string(val) : "";
-                "<td><input type='number' class='edit-cell' " + inputAttrs + " value='" + numVal + "' step='any' /></td>";
+                "<td><input type='number' class='edit-cell' " + inputAttrs + " value='" + numVal + "' step='any'" + errorStyle + " /></td>";
+            
+            case TId:
+                var strVal = val != null ? Std.string(val) : "";
+                "<td><input type='text' class='edit-cell id-cell' " + inputAttrs + " value='" + escapeHtml(strVal) + "' style='font-weight:bold;color:#1565C0;'" + errorStyle + " /></td>";
+            
+            case TImage:
+                var strVal = val != null ? Std.string(val) : "";
+                "<td><input type='text' class='edit-cell' " + inputAttrs + " value='" + escapeHtml(strVal) + "' placeholder='image path'" + errorStyle + " /></td>";
+            
+            case TFile:
+                var strVal = val != null ? Std.string(val) : "";
+                "<td><input type='text' class='edit-cell' " + inputAttrs + " value='" + escapeHtml(strVal) + "' placeholder='file path'" + errorStyle + " /></td>";
             
             default:
                 var strVal = val != null ? Std.string(val) : "";
-                "<td><input type='text' class='edit-cell' " + inputAttrs + " value='" + escapeHtml(strVal) + "' /></td>";
+                "<td><input type='text' class='edit-cell' " + inputAttrs + " value='" + escapeHtml(strVal) + "'" + errorStyle + " /></td>";
         }
     }
     
@@ -547,7 +1286,6 @@ class CastleDBApp {
             var value = null;
             
             if (target.hasClass("flag-check")) {
-                var flag = parseInt(target.attr("data-flag"));
                 var flagsCell = target.closest(".flags-cell");
                 var currentFlags = 0;
                 flagsCell.find(".flag-check").each(function() {
@@ -561,6 +1299,8 @@ class CastleDBApp {
             } else if (target.attr("type") === "number") {
                 var num = parseFloat(target.val());
                 if (!isNaN(num)) value = num;
+            } else if (target.hasClass("color-cell")) {
+                value = target.val();
             } else {
                 value = target.val();
                 if (value === "") value = null;
@@ -568,10 +1308,32 @@ class CastleDBApp {
             
             CastleDBApp.updateCell(row, col, value);
         });
+        
+        $(".color-cell").each(function() {
+            var input = $(this);
+            if (input.data("spectrumInitialized")) return;
+            input.data("spectrumInitialized", true);
+            
+            var colorVal = input.val() || "#000000";
+            input.spectrum({
+                showAlpha: true,
+                showInput: true,
+                preferredFormat: "hex8",
+                color: colorVal,
+                change: function(color) {
+                    var hex = color.toString();
+                    input.val(hex);
+                    var row = parseInt(input.attr("data-row"));
+                    var col = parseInt(input.attr("data-col"));
+                    CastleDBApp.updateCell(row, col, hex);
+                }
+            });
+        });
         ');
     }
     
     static function escapeHtml(s: String): String {
+        if (s == null) return "";
         return StringTools.htmlEscape(s);
     }
     
@@ -581,7 +1343,7 @@ class CastleDBApp {
         try {
             var stored = js.Browser.getLocalStorage().getItem("castle_recent");
             if (stored != null) {
-                return haxe.Unserializer.run(stored);
+                return haxe.Json.parse(stored);
             }
         } catch(e: Dynamic) {}
         return [];
@@ -593,7 +1355,7 @@ class CastleDBApp {
             recent.remove(path);
             recent.unshift(path);
             if (recent.length > 10) recent.pop();
-            js.Browser.getLocalStorage().setItem("castle_recent", haxe.Serializer.run(recent));
+            js.Browser.getLocalStorage().setItem("castle_recent", haxe.Json.stringify(recent));
         } catch(e: Dynamic) {}
     }
 }
