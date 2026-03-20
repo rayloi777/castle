@@ -29,38 +29,66 @@ class Parser {
 	}
 
 	public static function getType( str : String ) : Data.ColumnType {
-		return switch( Std.parseInt(str) ) {
-		case 0: TId;
-		case 1: TString;
-		case 2: TBool;
-		case 3: TInt;
-		case 4: TFloat;
-		case 5: TEnum(str.substr(str.indexOf(":") + 1).split(","));
-		case 6: TRef(str.substr(str.indexOf(":") + 1));
-		case 7: TImage;
-		case 8: TList;
-		case 9: TCustom(str.substr(str.indexOf(":") + 1));
-		case 10: TFlags(str.substr(str.indexOf(":") + 1).split(","));
-		case 11: TColor;
-		case 12: TLayer(str.substr(str.indexOf(":") + 1));
-		case 13: TFile;
-		case 14: TTilePos;
-		case 15: TTileLayer;
-		case 16: TDynamic;
-		case 17: TProperties;
-		case 18: TGradient;
-		case 19: TCurve;
-		case 20: TGuid;
-		case 21: TPolymorph;
-		default: throw "Unknown type " + str;
+		var idx = Std.parseInt(str);
+		if( idx != null ) {
+			return switch( idx ) {
+			case 0: TId;
+			case 1: TString;
+			case 2: TBool;
+			case 3: TInt;
+			case 4: TFloat;
+			case 5: TEnum(str.substr(str.indexOf(":") + 1).split(","));
+			case 6: TRef(str.substr(str.indexOf(":") + 1));
+			case 7: TImage;
+			case 8: TList;
+			case 9: TCustom(str.substr(str.indexOf(":") + 1));
+			case 10: TFlags(str.substr(str.indexOf(":") + 1).split(","));
+			case 11: TColor;
+			case 12: TLayer(str.substr(str.indexOf(":") + 1));
+			case 13: TFile;
+			case 14: TTilePos;
+			case 15: TTileLayer;
+			case 16: TDynamic;
+			case 17: TProperties;
+			case 18: TGradient;
+			case 19: TCurve;
+			case 20: TGuid;
+			case 21: TPolymorph;
+			default: throw "Unknown type index " + idx;
+			}
+		}
+		// Fallback: support string format for backwards compatibility
+		return switch( str ) {
+			case "string", "TString": TString;
+			case "int", "TInt": TInt;
+			case "float", "TFloat": TFloat;
+			case "bool", "TBool": TBool;
+			case "color", "TColor": TColor;
+			case "file", "TFile": TFile;
+			case "image", "TImage": TImage;
+			case "list", "TList": TList;
+			case "properties", "TProperties": TProperties;
+			case "guid", "TGuid": TGuid;
+			case "id", "TId": TId;
+			default:
+				if( StringTools.startsWith(str, "ref:") ) TRef(str.substr(4));
+				else if( StringTools.startsWith(str, "enum:") ) TEnum(str.substr(5).split(","));
+				else if( StringTools.startsWith(str, "flags:") ) TFlags(str.substr(6).split(","));
+				else throw "Unknown type " + str;
 		}
 	}
 
 	public static function parse( content : String, editMode : Bool ) : Data {
 		if( content == null ) throw "CDB content is null";
 		var data : Data = haxe.Json.parse(content);
+		if( data.sheets == null ) data.sheets = [];
+		if( data.customTypes == null ) data.customTypes = [];
 		var structRefs = [];
-		for( s in data.sheets )
+		for( s in data.sheets ) {
+			if( s.columns == null ) s.columns = [];
+			if( s.lines == null ) s.lines = [];
+			if( s.separators == null ) s.separators = [];
+			if( s.props == null ) s.props = {};
 			for( c in s.columns ) {
 				if( c.structRef != null ) {
 					structRefs.push(c);
@@ -70,6 +98,7 @@ class Parser {
 					c.typeStr = null;
 				}
 			}
+		}
 		for (c in structRefs) {
 			var parts = c.structRef.split("@");
 			var colName = parts.pop();
@@ -77,16 +106,20 @@ class Parser {
 			var refCol = Lambda.find(refSheet.columns, (c) -> c.name == colName);
 			c.type = refCol.type;
 		}
-		for( t in data.customTypes )
-			for( c in t.cases )
+		for( t in data.customTypes ) {
+			if( t.cases == null ) t.cases = [];
+			for( c in t.cases ) {
+				if( c.args == null ) c.args = [];
 				for( a in c.args ) {
 					a.type = getType(a.typeStr);
 					a.typeStr = null;
 				}
+			}
+		}
 
 		// resolve separators
 		for( s in data.sheets ) {
-			if( !(editMode || s.props.hasGroup) ) continue;
+			if( !(editMode || (s.props != null && s.props.hasGroup)) ) continue;
 
 			if( s.separators == null ) {
 				var ids : Array<Dynamic> = Reflect.field(s,"separatorIds");

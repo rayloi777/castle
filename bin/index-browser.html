@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>CastleDB Browser</title>
+	<style>
+		body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+		#menu { background: #333; color: white; padding: 10px; display: flex; gap: 10px; }
+		#menu button { background: #555; color: white; border: none; padding: 8px 16px; cursor: pointer; border-radius: 4px; }
+		#menu button:hover { background: #666; }
+		#toolbar { background: #444; padding: 5px 10px; display: none; }
+		#toolbar button { background: #666; color: white; border: none; padding: 5px 10px; cursor: pointer; margin-right: 5px; border-radius: 3px; }
+		#toolbar button:hover { background: #777; }
+		.sheet-tabs { background: #f0f0f0; padding: 5px 5px 0 5px; border-bottom: 1px solid #ddd; display: none; }
+		.sheet-tabs .tab { display: inline-block; padding: 8px 15px; cursor: pointer; background: #e0e0e0; margin-right: 2px; border-radius: 3px 3px 0 0; border: 1px solid #ccc; border-bottom: none; }
+		.sheet-tabs .tab:hover { background: #d0d0d0; }
+		.sheet-tabs .tab.active { background: white; font-weight: bold; border-color: #ddd; margin-bottom: -1px; padding-bottom: 9px; }
+		#content { padding: 20px; display: none; }
+		table { border-collapse: collapse; width: 100%; background: white; }
+		th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+		th { background: #f5f5f5; font-weight: bold; }
+		tr:hover { background: #f9f9f9; }
+		#welcome { text-align: center; padding: 50px; }
+		#welcome h1 { color: #333; margin-bottom: 20px; }
+		#welcome button { background: #4A90D9; color: white; border: none; padding: 15px 30px; font-size: 16px; cursor: pointer; border-radius: 5px; }
+		#welcome button:hover { background: #357ABD; }
+		#recent-files { margin-top: 30px; text-align: left; display: inline-block; }
+		#recent-files h3 { color: #666; margin-bottom: 10px; }
+		#recent-files ul { list-style: none; padding: 0; }
+		#recent-files li { padding: 5px 0; }
+		#recent-files a { color: #4A90D9; cursor: pointer; }
+		#recent-files a:hover { text-decoration: underline; }
+		.browser-context-menu { position: absolute; background: white; border: 1px solid #ccc; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); padding: 0; min-width: 150px; display: none; }
+		.browser-context-menu li { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee; list-style: none; }
+		.browser-context-menu li:hover { background: #f0f0f0; }
+		.browser-context-menu li:last-child { border-bottom: none; }
+		.error-cell { background: #ffebee !important; color: #c62828; }
+		.status-bar { background: #f5f5f5; padding: 5px 10px; font-size: 12px; color: #666; border-top: 1px solid #ddd; display: none; }
+		.modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; }
+		.modal-content { background: white; padding: 20px; border-radius: 8px; min-width: 300px; max-width: 500px; }
+		.modal h2 { margin-top: 0; }
+		.modal-buttons { text-align: right; margin-top: 15px; }
+		.modal-buttons button { margin-left: 10px; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; }
+		.modal-buttons .btn-primary { background: #4A90D9; color: white; }
+		.modal-buttons .btn-secondary { background: #ccc; color: #333; }
+		input[type="text"], select { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
+		.form-group { margin-bottom: 10px; }
+		.form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+		.color-input { width: 60px; height: 30px; padding: 0; border: 1px solid #ddd; }
+		.flags-cell label { display: inline-block; margin-right: 10px; font-size: 12px; }
+		.flags-cell input[type="checkbox"] { width: auto; margin-right: 3px; }
+		#table-body input[type="text"], #table-body input[type="number"] { width: 100%; border: 1px solid transparent; padding: 4px; }
+		#table-body input[type="text"]:focus, #table-body input[type="number"]:focus { border-color: #4A90D9; }
+		#table-body select { width: 100%; padding: 4px; }
+		tr.selected { background: #e3f2fd !important; }
+	</style>
+</head>
+<body>
+	<div id="menu">
+		<span style="font-weight: bold; font-size: 16px;">CastleDB</span>
+		<button onclick="openFile()">Open</button>
+		<button onclick="saveFile()">Save</button>
+		<button onclick="saveFileAs()">Save As</button>
+		<button onclick="showNewSheetModal()">New Sheet</button>
+		<button onclick="showNewColumnModal()">New Column</button>
+	</div>
+	
+	<div id="welcome">
+		<h1>Welcome to CastleDB</h1>
+		<button onclick="openFile()">Open .cdb File</button>
+		<button onclick="createNewFile()" style="background: #5cb85c; margin-left: 10px;">Create New</button>
+		<div id="recent-files" style="display: none;">
+			<h3>Recent Files</h3>
+			<ul id="recent-list"></ul>
+		</div>
+	</div>
+	
+	<div id="toolbar">
+		<button onclick="addRow()">+ Add Row</button>
+		<button onclick="deleteSelectedRow()">Delete Row</button>
+	</div>
+	<div class="sheet-tabs" id="sheet-tabs"></div>
+	<div id="content">
+		<table id="data-table">
+			<thead id="table-head"></thead>
+			<tbody id="table-body"></tbody>
+		</table>
+	</div>
+	<div class="status-bar" id="status-bar"></div>
+	
+	<ul class="browser-context-menu" id="context-menu"></ul>
+	
+	<div id="modal-container"></div>
+	
+	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script src="castle-browser.js"></script>
+	<script>
+		var currentFileName = null;
+		var selectedRowIndex = -1;
+		var fileHandle = null;
+		var hasFileSystemAccess = 'showOpenFilePicker' in window;
+		
+		function checkFileSystemAccess() {
+		 return hasFileSystemAccess && window.isSecureContext;
+        }
+        
+        async function openFile() {
+            if (checkFileSystemAccess()) {
+                try {
+                    var handles = await window.showOpenFilePicker({
+                        types: [{
+                            description: 'CDB Files',
+                            accept: { 'application/json': ['.cdb'] }
+                        }],
+                        multiple: false
+                    });
+                    fileHandle = handles[0];
+                    var file = await fileHandle.getFile();
+                    currentFileName = file.name;
+                    var content = await file.text();
+                    try {
+                        CastleDBApp.loadCDB(content);
+                        addToRecent(file.name);
+                    } catch(e) {
+                        console.error("LoadCDB error:", e);
+                        if(e && e.stack) console.error(e.stack);
+                        alert('Error loading file: ' + (e.message || e));
+                        throw e;
+                    }
+                    showEditor();
+                    updateStatusBar('Opened: ' + file.name);
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('Error opening file:', err);
+                        alert('Error opening file: ' + err.message);
+                    }
+                }
+            } else {
+                openFileFallback();
+            }
+        }
+        
+        function openFileFallback() {
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.cdb';
+            input.onchange = function(e) {
+                var file = e.target.files[0];
+                if (file) {
+                    currentFileName = file.name;
+                    fileHandle = null;
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            CastleDBApp.loadCDB(e.target.result);
+                            addToRecent(file.name);
+                            showEditor();
+                        } catch (err) {
+                            alert('Error loading file: ' + err);
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        }
+        
+        async function saveFile() {
+            var content = CastleDBApp.getCDBContent();
+            if (!content) return;
+            
+            if (checkFileSystemAccess() && fileHandle) {
+                try {
+                    var permission = await fileHandle.queryPermission({ mode: 'write' });
+                    if (permission === 'granted') {
+                        var writable = await fileHandle.createWritable();
+                        await writable.write(content);
+                        await writable.close();
+                        updateStatusBar('Saved: ' + currentFileName);
+                        return;
+                    }
+                } catch (err) {
+                    console.log('Permission check failed, will try save as');
+                }
+            }
+            await saveFileAs();
+        }
+        
+        async function saveFileAs() {
+            var content = CastleDBApp.getCDBContent();
+            if (!content) return;
+            
+            if (checkFileSystemAccess()) {
+                try {
+                    var handle = await window.showSaveFilePicker({
+                        suggestedName: currentFileName || 'data.cdb',
+                        types: [{
+                            description: 'CDB Files',
+                            accept: { 'application/json': ['.cdb'] }
+                        }]
+                    });
+                    var writable = await handle.createWritable();
+                    await writable.write(content);
+                    await writable.close();
+                    fileHandle = handle;
+                    currentFileName = handle.name;
+                    updateStatusBar('Saved: ' + currentFileName);
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('Save error:', err);
+                        downloadFallback(content);
+                    }
+                }
+            } else {
+                downloadFallback(content);
+            }
+        }
+        
+        function downloadFallback(content) {
+            var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = currentFileName || 'data.cdb';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function() {
+                URL.revokeObjectURL(url);
+                a.remove();
+            }, 100);
+        }
+        
+        function createNewFile() {
+            CastleDBApp.createNewDatabase();
+            currentFileName = 'new_database.cdb';
+            fileHandle = null;
+            showEditor();
+        }
+        
+        function showEditor() {
+            $('#welcome').hide();
+            $('#toolbar').show();
+            $('.sheet-tabs').show();
+            $('#content').show();
+            $('#status-bar').show();
+        }
+        
+        function updateStatusBar(msg) {
+            var info = CastleDBApp.getSheetInfo();
+            var text = info.rowCount + ' rows | ' + info.colCount + ' columns' + (msg || '');
+            $('#status-bar').text(text);
+        }
+        
+        function showNewSheetModal() {
+            var html = '<div class="modal"><div class="modal-content">' +
+                '<h2>New Sheet</h2>' +
+                '<div class="form-group"><label>Sheet Name</label><input type="text" id="new-sheet-name"></div>' +
+                '<div class="modal-buttons">' +
+                '<button class="btn-secondary" onclick="closeModal()">Cancel</button>' +
+                '<button class="btn-primary" onclick="createNewSheet()">Create</button>' +
+                '</div></div></div>';
+            $('#modal-container').html(html);
+            setTimeout(function() { $('#new-sheet-name').focus(); }, 100);
+        }
+        
+        function createNewSheet() {
+            var name = $('#new-sheet-name').val();
+            if (name) {
+                CastleDBApp.createSheet(name);
+            }
+            closeModal();
+        }
+        
+        function showNewColumnModal() {
+            var sheet = CastleDBApp.getCurrentSheet();
+            var sheets = CastleDBApp.getSheetNames();
+            
+            var html = '<div class="modal"><div class="modal-content" style="max-width: 600px;">' +
+                '<h2>New Column</h2>' +
+                '<div class="form-group"><label>Column Name</label><input type="text" id="new-col-name"></div>' +
+                '<div class="form-group"><label>Type</label>' +
+                '<select id="new-col-type" onchange="updateColumnTypeOptions()">' +
+                '<option value="string">Text</option>' +
+                '<option value="int">Integer</option>' +
+                '<option value="float">Float</option>' +
+                '<option value="bool">Boolean</option>' +
+                '<option value="color">Color</option>' +
+                '<option value="file">File</option>' +
+                '<option value="image">Image</option>' +
+                '<option value="enum">Enumeration</option>' +
+                '<option value="flags">Flags</option>' +
+                '<option value="ref">Reference</option>' +
+                '<option value="list">List</option>' +
+                '<option value="properties">Properties</option>' +
+                '<option value="guid">GUID</option>' +
+                '</select></div>' +
+                '<div class="form-group" id="enum-values-group" style="display:none;">' +
+                '<label>Enum Values (comma separated)</label>' +
+                '<input type="text" id="new-col-enum" placeholder="value1,value2,value3"></div>' +
+                '<div class="form-group" id="ref-sheet-group" style="display:none;">' +
+                '<label>Reference Sheet</label>' +
+                '<select id="new-col-ref">' +
+                sheets.map(function(s) { return '<option value="' + s + '">' + s + '</option>'; }).join('') +
+                '</select></div>' +
+                '<div class="form-group"><label><input type="checkbox" id="new-col-opt"> Optional</label></div>' +
+                '<div class="modal-buttons">' +
+                '<button class="btn-secondary" onclick="closeModal()">Cancel</button>' +
+                '<button class="btn-primary" onclick="createNewColumn()">Create</button>' +
+                '</div></div></div>';
+            $('#modal-container').html(html);
+            setTimeout(function() { $('#new-col-name').focus(); }, 100);
+        }
+        
+        function updateColumnTypeOptions() {
+            var type = $('#new-col-type').val();
+            $('#enum-values-group').toggle(type === 'enum' || type === 'flags');
+            $('#ref-sheet-group').toggle(type === 'ref');
+        }
+        
+        function createNewColumn() {
+            var name = $('#new-col-name').val();
+            var type = $('#new-col-type').val();
+            var opt = $('#new-col-opt').is(':checked');
+            
+            if (name && type) {
+                var colData = {
+                    name: name,
+                    type: type,
+                    typeStr: type,
+                    opt: opt,
+                    enumValues: $('#new-col-enum').val(),
+                    refSheet: $('#new-col-ref').val()
+                };
+                CastleDBApp.createColumn(CastleDBApp.getCurrentSheetName(), colData);
+            }
+            closeModal();
+        }
+        
+        function closeModal() {
+            $('#modal-container').empty();
+        }
+        
+        function addRow() {
+            CastleDBApp.addRow();
+            updateStatusBar('Row added');
+        }
+        
+        function deleteSelectedRow() {
+            if (selectedRowIndex >= 0) {
+                CastleDBApp.deleteRow(selectedRowIndex);
+                selectedRowIndex = -1;
+                updateStatusBar('Row deleted');
+            }
+        }
+        
+        function addToRecent(fileName) {
+            try {
+                var recent = CastleDBApp.getRecentFiles();
+                recent = recent.filter(function(f) { return f !== fileName; });
+                recent.unshift(fileName);
+                if (recent.length > 10) recent.pop();
+                localStorage.setItem('castle_recent', JSON.stringify(recent));
+                updateRecentList();
+            } catch(e) {}
+        }
+        
+        function updateRecentList() {
+            try {
+                var recent = CastleDBApp.getRecentFiles();
+                if (recent && recent.length > 0) {
+                    var html = '<ul>';
+                    recent.forEach(function(f) {
+                        html += '<li><a onclick="openRecent(\'' + f + '\')">' + f + '</a></li>';
+                    });
+                    html += '</ul>';
+                    $('#recent-files').show();
+                    $('#recent-list').html(html);
+                }
+            } catch(e) {}
+        }
+        
+        function openRecent(fileName) {
+            alert('Please open the file manually: ' + fileName);
+        }
+        
+        $(document).ready(function() {
+            updateRecentList();
+            
+            $('#table-body').on('click', 'tr', function() {
+                $('#table-body tr').removeClass('selected');
+                $(this).addClass('selected');
+                selectedRowIndex = $(this).index();
+            });
+            
+            $('#table-body').on('contextmenu', 'tr', function(e) {
+                e.preventDefault();
+                selectedRowIndex = $(this).index();
+                var menu = $('#context-menu');
+                menu.html(
+                    '<li onclick="deleteSelectedRow()">Delete Row</li>' +
+                    '<li onclick="CastleDBApp.duplicateRow(selectedRowIndex); selectedRowIndex = -1;">Duplicate Row</li>' +
+                    '<li onclick="CastleDBApp.moveRow(selectedRowIndex, selectedRowIndex - 1); selectedRowIndex = -1;">Move Up</li>' +
+                    '<li onclick="CastleDBApp.moveRow(selectedRowIndex, selectedRowIndex + 1); selectedRowIndex = -1;">Move Down</li>' +
+                    '<li onclick="CastleDBApp.copyRow(selectedRowIndex);">Copy Row</li>' +
+                    '<li onclick="CastleDBApp.pasteRow(selectedRowIndex);">Paste Row</li>'
+                );
+                menu.css({ left: e.pageX + 'px', top: e.pageY + 'px', display: 'block' });
+            });
+            
+            $(document).click(function(e) {
+                if (!$(e.target).closest('.browser-context-menu').length) {
+                    $('.browser-context-menu').hide();
+                }
+            });
+            
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey || e.metaKey) {
+                    switch(e.key) {
+                        case 's': e.preventDefault(); saveFile(); break;
+                        case 'z': e.preventDefault(); CastleDBApp.undo(); updateStatusBar('Undo'); break;
+                        case 'y': e.preventDefault(); CastleDBApp.redo(); updateStatusBar('Redo'); break;
+                    }
+                }
+                if (e.key === 'Delete' && selectedRowIndex >= 0) {
+                    e.preventDefault();
+                    deleteSelectedRow();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

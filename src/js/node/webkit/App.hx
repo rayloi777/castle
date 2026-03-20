@@ -1,21 +1,39 @@
 package js.node.webkit;
 
-@:jsRequire("nw.gui", "App")
-extern class App {
+@:expose
+class App {
+	static var argv: Array<String> = [];
+	static var fullArgv: Array<String> = [];
+	static var dataPath: String = "";
+	static var manifest: Dynamic = {};
 
-	static var argv : Array<String>;
-	static var fullArgv : Array<String>;
-	static var dataPath : String;
-	static var manifest : Dynamic;
+	public static function quit(): Void {
+		// Cannot quit browser
+	}
 
-	static function quit() : Void;
-	static function clearCache() : Void;
-	static function closeAllWindows() : Void;
-	static function crashBrowser() : Void;
-	static function crashRenderer() : Void;
-	static function getProxyForURL( url : String ) : String;
-	static function setProxyConfig( config : String ) : Void;
+	public static function clearCache(): Void {
+		// No-op in browser
+	}
 
-	static function on( event : String, callb : Dynamic -> Void ) : Void;
+	public static function closeAllWindows(): Void {
+		// No-op in browser
+	}
 
+	public static function crashBrowser(): Void {
+		throw "Cannot crash browser";
+	}
+
+	public static function crashRenderer(): Void {
+		throw "Cannot crash renderer";
+	}
+
+	public static function getProxyForURL(url: String): String {
+		return "";
+	}
+
+	public static function setProxyConfig(config: String): Void {}
+
+	public static function on(event: String, callb: Dynamic -> Void): Void {
+		// No-op in browser
+	}
 }

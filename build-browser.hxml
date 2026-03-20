@@ -1,0 +1,7 @@
+# CastleDB Browser Build
+-cp src
+-cp .
+-js bin/castle-browser.js
+-main MainBrowser
+-cp /usr/local/lib/haxe/lib/hx3compat/git/std/
+-D js-es=6

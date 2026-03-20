@@ -8,3 +8,6 @@
 /bin/castle.js
 /bin/nwjs
 /bin/*.lnk
+
+/bin/nwjs.app/
+/bin/castle-browser.js
