@@ -18,11 +18,11 @@ package sys;
 @:expose
 class Sys {
 	public static function print(v: Dynamic): Void {
-		untyped __js__('console.log(String({0}))', Std.string(v));
+		js.Syntax.code("console.log(String({0}))", Std.string(v));
 	}
 
 	public static function println(v: Dynamic): Void {
-		untyped __js__('console.log(String({0}))', Std.string(v));
+		js.Syntax.code("console.log(String({0}))", Std.string(v));
 	}
 
 	public static function args(): Array<String> {
@@ -30,7 +30,7 @@ class Sys {
 	}
 
 	public static function getEnv(s: String): String {
-		return untyped __js__('process.env[s]');
+		return js.Syntax.code("process.env[s]");
 	}
 
 	public static function putEnv(s: String, v: Null<String>): Void {
@@ -39,7 +39,7 @@ class Sys {
 
 	public static function systemName(): String {
 		#if js
-		var platform: String = untyped __js__('navigator.platform');
+		var platform: String = js.Syntax.code("navigator.platform");
 		if (platform.indexOf("Mac") >= 0) return "Mac";
 		if (platform.indexOf("Win") >= 0) return "Windows";
 		if (platform.indexOf("Linux") >= 0) return "Linux";
@@ -98,7 +98,7 @@ class Sys {
 	}
 
 	public static function programPath(): String {
-		return untyped __js__('window.location.href');
+		return js.Syntax.code("window.location.href");
 	}
 
 	public static function environment(): Map<String, String> {

@@ -7,16 +7,16 @@ class Clipboard {
 	public function new() {}
 
 	public static inline function getInstance(): Clipboard {
-		if (untyped window._castleClipboard == null) {
-			untyped window._castleClipboard = new Clipboard();
+		if (js.Syntax.code("window._castleClipboard") == null) {
+			js.Syntax.code("window._castleClipboard = {0}", new Clipboard());
 		}
-		return untyped window._castleClipboard;
+		return js.Syntax.code("window._castleClipboard");
 	}
 
 	public function get(?type: String): Dynamic {
 		#if js
 		try {
-			return untyped __js__('navigator.clipboard.readText()');
+			return js.Syntax.code("navigator.clipboard.readText()");
 		} catch(e: Dynamic) {
 			return "";
 		}
@@ -27,13 +27,13 @@ class Clipboard {
 
 	public function set(data: Dynamic, ?type: String): Void {
 		#if js
-		untyped __js__('navigator.clipboard.writeText({0})', Std.string(data));
+		js.Syntax.code("navigator.clipboard.writeText({0})", Std.string(data));
 		#end
 	}
 
 	public function clear(): Void {
 		#if js
-		untyped __js__('navigator.clipboard.writeText("")');
+		js.Syntax.code("navigator.clipboard.writeText(\"\")");
 		#end
 	}
 }

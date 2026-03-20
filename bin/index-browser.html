@@ -84,6 +84,12 @@
 		.color-cell { width: 80px; height: 26px; border: 1px solid #ddd; border-radius: 3px; cursor: pointer; }
 		.sp-preview { width: 20px !important; height: 20px !important; }
 		.sp-container { border-radius: 4px; }
+		
+		.image-preview { max-width: 100px; max-height: 60px; cursor: pointer; border: 1px solid #ddd; border-radius: 3px; }
+		.image-preview:hover { border-color: #4A90D9; }
+		.image-missing { color: #c62828; cursor: pointer; font-size: 11px; }
+		.image-upload-btn { padding: 4px 8px; background: #4A90D9; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; }
+		.image-upload-btn:hover { background: #357ABD; }
 		.flags-cell label { display: inline-block; margin-right: 10px; font-size: 11px; }
 		.flags-cell input[type="checkbox"] { width: auto; margin-right: 3px; }
 		
@@ -135,6 +141,8 @@
 		<button onclick="showNewSheetModal()">New Sheet</button>
 		<button onclick="showNewColumnModal()">New Column</button>
 	</div>
+	
+	<input type="file" id="image-file-input" accept="image/*" style="display:none" onchange="handleImageFileSelect(this)">
 	
 	<div id="welcome">
 		<h1>Welcome to CastleDB</h1>
@@ -214,11 +222,11 @@
 		async function openFile() {
 			if (checkFileSystemAccess()) {
 				try {
-					showLoading(true);
 					var handles = await window.showOpenFilePicker({
 						types: [{ description: 'CDB Files', accept: { 'application/json': ['.cdb'] } }],
 						multiple: false
 					});
+					showLoading(true);
 					fileHandle = handles[0];
 					var file = await fileHandle.getFile();
 					currentFileName = file.name;
@@ -227,21 +235,21 @@
 						CastleDBApp.loadCDB(content);
 						addToRecent(file.name);
 					} catch(e) {
+						showLoading(false);
 						console.error("LoadCDB error:", e);
 						showToast('Error loading file: ' + (e.message || e), 'error');
 						throw e;
 					}
 					showEditor();
-					updateStatusBar('Opened: ' + file.name);
 					showToast('File loaded successfully', 'success');
 				} catch (err) {
-					if (err.name !== 'AbortError') {
-						console.error('Error opening file:', err);
-						showToast('Error opening file: ' + err.message, 'error');
-					}
-				} finally {
+					if (err.name === 'AbortError') return;
 					showLoading(false);
+					console.error('Error opening file:', err);
+					showToast('Error opening file: ' + err.message, 'error');
+					return;
 				}
+				showLoading(false);
 			} else {
 				openFileFallback();
 			}
@@ -276,29 +284,35 @@
 			input.click();
 		}
 		
+		function handleImageFileSelect(input) {
+			var file = input.files[0];
+			if (!file) return;
+			
+			var reader = new FileReader();
+			reader.onload = function(e) {
+				var dataUrl = e.target.result;
+				CastleDBApp.handleImageUpload(dataUrl, file.name);
+				input.value = '';
+			};
+			reader.readAsDataURL(file);
+		}
+		
 		async function saveFile() {
 			var content = CastleDBApp.getCDBContent();
 			if (!content) return;
 			
-			showLoading(true);
 			if (checkFileSystemAccess() && fileHandle) {
 				try {
-					var permission = await fileHandle.queryPermission({ mode: 'write' });
-					if (permission === 'granted') {
-						var writable = await fileHandle.createWritable();
-						await writable.write(content);
-						await writable.close();
-						updateStatusBar('Saved: ' + currentFileName);
-						showToast('File saved', 'success');
-						showLoading(false);
-						return;
-					}
+					var writable = await fileHandle.createWritable();
+					await writable.write(content);
+					await writable.close();
+					showToast('File saved', 'success');
+					return;
 				} catch (err) {
-					console.log('Permission check failed, will try save as');
+					console.log('Direct write failed:', err);
 				}
 			}
 			await saveFileAs();
-			showLoading(false);
 		}
 		
 		async function saveFileAs() {
@@ -307,28 +321,28 @@
 			
 			if (checkFileSystemAccess()) {
 				try {
-					showLoading(true);
 					var handle = await window.showSaveFilePicker({
 						suggestedName: currentFileName || 'data.cdb',
 						types: [{ description: 'CDB Files', accept: { 'application/json': ['.cdb'] } }]
 					});
+					showLoading(true);
 					var writable = await handle.createWritable();
 					await writable.write(content);
 					await writable.close();
 					fileHandle = handle;
 					currentFileName = handle.name;
-					updateStatusBar('Saved: ' + currentFileName);
 					showToast('File saved as ' + currentFileName, 'success');
 				} catch (err) {
-					if (err.name !== 'AbortError') {
-						console.error('Save error:', err);
-						downloadFallback(content);
-					}
+					showLoading(false);
+					if (err.name === 'AbortError') return;
+					console.error('Save error:', err);
+					showToast('Save failed: ' + err.message, 'error');
+					return;
 				}
+				showLoading(false);
 			} else {
 				downloadFallback(content);
 			}
-			showLoading(false);
 		}
 		
 		function downloadFallback(content) {
@@ -747,7 +761,10 @@
 				refSheet: $('#col-ref').val()
 			};
 			
-			CastleDBApp.createColumn(CastleDBApp.getCurrentSheetName(), colData);
+			if (!CastleDBApp.createColumn(CastleDBApp.getCurrentSheetName(), colData)) {
+				showToast('Column name already exists', 'error');
+				return;
+			}
 			closeModal();
 			showToast('Column created', 'success');
 		}
@@ -770,7 +787,10 @@
 				refSheet: $('#col-ref').val()
 			};
 			
-			CastleDBApp.editColumn(CastleDBApp.getCurrentSheetName(), editingColumnIndex, colData);
+			if (!CastleDBApp.editColumn(CastleDBApp.getCurrentSheetName(), editingColumnIndex, colData)) {
+				showToast('Column name already exists', 'error');
+				return;
+			}
 			closeModal();
 			showToast('Column updated', 'success');
 		}
@@ -1122,6 +1142,59 @@
 		function escapeHtml(s) {
 			if (s == null) return '';
 			return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+		}
+		
+		function setupCellHandlers() {
+			$('.edit-cell').off('change').on('change', function(e) {
+				var target = $(e.target);
+				var row = parseInt(target.attr('data-row'));
+				var col = parseInt(target.attr('data-col'));
+				var value = null;
+				
+				if (target.hasClass('flag-check')) {
+					var flagsCell = target.closest('.flags-cell');
+					var currentFlags = 0;
+					flagsCell.find('.flag-check').each(function() {
+						if ($(this).is(':checked')) {
+							currentFlags |= (1 << parseInt($(this).attr('data-flag')));
+						}
+					});
+					value = currentFlags;
+				} else if (target.attr('type') === 'checkbox' && !target.hasClass('flag-check')) {
+					value = target.is(':checked');
+				} else if (target.attr('type') === 'number') {
+					var num = parseFloat(target.val());
+					if (!isNaN(num)) value = num;
+				} else if (target.hasClass('color-cell')) {
+					value = target.val();
+				} else {
+					value = target.val();
+					if (value === '') value = null;
+				}
+				
+				CastleDBApp.updateCell(row, col, value);
+			});
+			
+			$('.color-cell').each(function() {
+				var input = $(this);
+				if (input.data('spectrumInitialized')) return;
+				input.data('spectrumInitialized', true);
+				
+				var colorVal = input.val() || '#000000';
+				input.spectrum({
+					showAlpha: true,
+					showInput: true,
+					preferredFormat: 'hex8',
+					color: colorVal,
+					change: function(color) {
+						var hex = color.toString();
+						input.val(hex);
+						var row = parseInt(input.attr('data-row'));
+						var col = parseInt(input.attr('data-col'));
+						CastleDBApp.updateCell(row, col, hex);
+					}
+				});
+			});
 		}
 		
 		// ==================== Event Handlers ====================

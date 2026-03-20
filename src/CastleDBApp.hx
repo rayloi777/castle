@@ -19,16 +19,18 @@ class CastleDBApp {
     static var historyIndex: Int = -1;
     static var clipboard: Dynamic = null;
     static var currentFilter: String = null;
+    static var currentFileName: String = null;
     static var subSheetData: {sheetName: String, rowIndex: Int, colIndex: Int, subSheet: Sheet, parentSheet: Sheet, parentRow: Dynamic} = null;
+    static var imageBank: Map<String, String> = new Map();
     
     public static function init() {
-        untyped __js__('
+        js.Syntax.code('
         document.addEventListener("keydown", function(e) {
             if (e.ctrlKey || e.metaKey) {
                 switch(e.key) {
                     case "s": e.preventDefault(); if(typeof saveFile === "function") saveFile(); break;
-                    case "z": e.preventDefault(); undo(); break;
-                    case "y": e.preventDefault(); redo(); break;
+                    case "z": e.preventDefault(); CastleDBApp.undo(); break;
+                    case "y": e.preventDefault(); CastleDBApp.redo(); break;
                     case "f": e.preventDefault(); document.getElementById("search-input").focus(); break;
                     case "c": if (!window.getSelection().toString()) CastleDBApp.copyRow(selectedRow); break;
                     case "v": if (!window.getSelection().toString()) CastleDBApp.pasteRow(selectedRow); break;
@@ -36,7 +38,7 @@ class CastleDBApp {
             }
             if (e.key === "Delete" && selectedRow >= 0 && !window.getSelection().toString()) {
                 e.preventDefault();
-                deleteRow(selectedRow);
+                CastleDBApp.deleteRow(selectedRow);
             }
             if (e.key === "Escape") {
                 CastleDBApp.clearSelection();
@@ -51,13 +53,13 @@ class CastleDBApp {
     public static function clearSelection(): Void {
         selectedRow = -1;
         selectedCol = -1;
-        untyped __js__("$('#table-body tr').removeClass('selected');");
-        untyped __js__("$('.context-menu').hide();");
+        js.Syntax.code("$('#table-body tr').removeClass('selected');");
+        js.Syntax.code("$('.context-menu').hide();");
         closeModalIfOpen();
     }
     
     static function closeModalIfOpen(): Void {
-        untyped __js__("if ($('#modal-container').html()) { closeModal(); }");
+        js.Syntax.code("if ($('#modal-container').html()) { closeModal(); }");
     }
     
     // ==================== File Operations ====================
@@ -70,11 +72,12 @@ class CastleDBApp {
             history = [];
             historyIndex = -1;
             currentFilter = null;
+            loadImageBank();
             saveState();
             renderUI();
         } catch(e: Dynamic) {
             trace("Error loading CDB: " + e);
-            untyped __js__('console.error(e && e.stack || e)');
+            js.Syntax.code("console.error(e && e.stack || e)");
             throw e;
         }
     }
@@ -187,6 +190,50 @@ class CastleDBApp {
         renderUI();
     }
     
+    // ==================== Image Bank Management ====================
+    
+    static function getImageBankKey(fileName: String): String {
+        return currentFileName != null ? 'castle_img_' + currentFileName : 'castle_img_default';
+    }
+    
+    public static function loadImageBank(): Void {
+        try {
+            var key = getImageBankKey(currentFileName);
+            var stored: String = js.Syntax.code("localStorage.getItem({0})", key);
+            imageBank = new Map();
+            if (stored != null) {
+                var data: Dynamic = haxe.Json.parse(stored);
+                for (field in Reflect.fields(data)) {
+                    imageBank.set(field, Reflect.field(data, field));
+                }
+            }
+        } catch(e: Dynamic) {
+            imageBank = new Map();
+        }
+    }
+    
+    public static function saveImageBank(): Void {
+        try {
+            var key = getImageBankKey(currentFileName);
+            var obj: Dynamic = {};
+            for (key in imageBank.keys()) {
+                Reflect.setField(obj, key, imageBank.get(key));
+            }
+            js.Syntax.code("localStorage.setItem({0},{1})", key, haxe.Json.stringify(obj));
+        } catch(e: Dynamic) {
+            trace('Failed to save image bank: ' + e);
+        }
+    }
+    
+    public static function getImageData(key: String): String {
+        return imageBank.get(key);
+    }
+    
+    public static function addImageToBank(key: String, data: String): Void {
+        imageBank.set(key, data);
+        saveImageBank();
+    }
+    
     // ==================== Sheet Management ====================
     
     @:expose
@@ -269,16 +316,28 @@ class CastleDBApp {
     
     // ==================== Column Management ====================
     
+    static function columnNameExists(sheet: Sheet, name: String, excludeIndex: Int = -1): Bool {
+        for (i in 0...sheet.columns.length) {
+            if (i == excludeIndex) continue;
+            if (sheet.columns[i].name == name) return true;
+        }
+        return false;
+    }
+    
     @:expose
     public static function createColumn(sheetName: String, colData: Dynamic): Bool {
         var sheet = db.getSheet(sheetName);
         if (sheet == null) return false;
         
+        var name = colData.name;
+        if (name == null || name == "") return false;
+        if (columnNameExists(sheet, name)) return false;
+        
         var colType: ColumnType = parseColumnType(colData.type, colData);
         
         saveState();
         @:privateAccess sheet.sheet.columns.push({
-            name: colData.name,
+            name: name,
             type: colType,
             typeStr: getTypeString(colType, colData),
             opt: colData.opt == true
@@ -293,13 +352,17 @@ class CastleDBApp {
         var sheet = db.getSheet(sheetName);
         if (sheet == null || colIndex < 0 || colIndex >= sheet.columns.length) return false;
         
+        var name = colData.name;
+        if (name == null || name == "") return false;
+        if (columnNameExists(sheet, name, colIndex)) return false;
+        
         var colType: ColumnType = parseColumnType(colData.type, colData);
         var oldCol = sheet.columns[colIndex];
         
         saveState();
         
         var newCol: Column = {
-            name: colData.name,
+            name: name,
             type: colType,
             typeStr: getTypeString(colType, colData),
             opt: colData.opt == true
@@ -309,11 +372,12 @@ class CastleDBApp {
         if (oldCol.kind != null) newCol.kind = oldCol.kind;
         if (oldCol.documentation != null) newCol.documentation = oldCol.documentation;
         
-        if (oldCol.name != colData.name) {
+        var nameChanged = oldCol.name != name;
+        if (nameChanged) {
             for (line in sheet.lines) {
                 var val = Reflect.field(line, oldCol.name);
                 Reflect.deleteField(line, oldCol.name);
-                Reflect.setField(line, colData.name, val);
+                Reflect.setField(line, name, val);
             }
         }
         
@@ -1265,11 +1329,34 @@ class CastleDBApp {
             
             case TImage:
                 var strVal = val != null ? Std.string(val) : "";
-                "<td><input type='text' class='edit-cell' " + inputAttrs + " value='" + escapeHtml(strVal) + "' placeholder='image path'" + errorStyle + " /></td>";
+                if (strVal != "" && strVal.indexOf(":") < 0) {
+                    var imgData = getImageData(strVal);
+                    if (imgData != null) {
+                        "<td><img src='" + imgData + "' class='image-preview' " + inputAttrs + " onclick='openImagePicker(" + rowIdx + "," + colIdx + ")' /></td>";
+                    } else {
+                        "<td><span class='image-missing' " + inputAttrs + " onclick='openImagePicker(" + rowIdx + "," + colIdx + ")'>[Missing: " + escapeHtml(strVal) + "]</span></td>";
+                    }
+                } else if (strVal != "") {
+                    "<td><img src='" + escapeHtml(strVal) + "' class='image-preview' " + inputAttrs + " onclick='openImagePicker(" + rowIdx + "," + colIdx + ")' /></td>";
+                } else {
+                    "<td><button class='image-upload-btn' " + inputAttrs + " onclick='openImagePicker(" + rowIdx + "," + colIdx + ")'>+ Image</button></td>";
+                }
             
             case TFile:
                 var strVal = val != null ? Std.string(val) : "";
-                "<td><input type='text' class='edit-cell' " + inputAttrs + " value='" + escapeHtml(strVal) + "' placeholder='file path'" + errorStyle + " /></td>";
+                var ext = strVal != "" ? strVal.split(".").pop().toLowerCase() : "";
+                var isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif" || ext == "webp");
+                if (isImage && strVal != "") {
+                    if (strVal.indexOf(":") >= 0) {
+                        "<td><img src='" + escapeHtml(strVal) + "' class='image-preview' /></td>";
+                    } else {
+                        "<td><span class='file-path'>" + escapeHtml(strVal) + " <span style='color:#888'>(URL not supported)</span></span></td>";
+                    }
+                } else if (strVal != "") {
+                    "<td><span class='file-path'>" + escapeHtml(strVal) + "</span></td>";
+                } else {
+                    "<td><input type='text' class='edit-cell' " + inputAttrs + " value='' placeholder='file path'" + errorStyle + " /></td>";
+                }
             
             default:
                 var strVal = val != null ? Std.string(val) : "";
@@ -1278,58 +1365,30 @@ class CastleDBApp {
     }
     
     static function attachCellHandlers(): Void {
-        untyped __js__('
-        $(".edit-cell").off("change").on("change", function(e) {
-            var target = $(e.target);
-            var row = parseInt(target.attr("data-row"));
-            var col = parseInt(target.attr("data-col"));
-            var value = null;
-            
-            if (target.hasClass("flag-check")) {
-                var flagsCell = target.closest(".flags-cell");
-                var currentFlags = 0;
-                flagsCell.find(".flag-check").each(function() {
-                    if ($(this).is(":checked")) {
-                        currentFlags |= (1 << parseInt($(this).attr("data-flag")));
-                    }
-                });
-                value = currentFlags;
-            } else if (target.attr("type") === "checkbox" && !target.hasClass("flag-check")) {
-                value = target.is(":checked");
-            } else if (target.attr("type") === "number") {
-                var num = parseFloat(target.val());
-                if (!isNaN(num)) value = num;
-            } else if (target.hasClass("color-cell")) {
-                value = target.val();
-            } else {
-                value = target.val();
-                if (value === "") value = null;
-            }
-            
-            CastleDBApp.updateCell(row, col, value);
-        });
+        js.Syntax.code("setupCellHandlers()");
+    }
+    
+    // ==================== Image Handling ====================
+    
+    @:expose
+    public static function openImagePicker(rowIndex: Int, colIndex: Int): Void {
+        js.Syntax.code("window.currentImagePickerRow = {0}", rowIndex);
+        js.Syntax.code("window.currentImagePickerCol = {0}", colIndex);
+        js.Syntax.code("document.getElementById(\"image-file-input\").click()");
+    }
+    
+    @:expose
+    public static function handleImageUpload(dataUrl: String, fileName: String): Void {
+        var ext = fileName.split(".").pop().toLowerCase();
+        var key = "img_" + Std.string(Date.now().getTime()) + "." + ext;
         
-        $(".color-cell").each(function() {
-            var input = $(this);
-            if (input.data("spectrumInitialized")) return;
-            input.data("spectrumInitialized", true);
-            
-            var colorVal = input.val() || "#000000";
-            input.spectrum({
-                showAlpha: true,
-                showInput: true,
-                preferredFormat: "hex8",
-                color: colorVal,
-                change: function(color) {
-                    var hex = color.toString();
-                    input.val(hex);
-                    var row = parseInt(input.attr("data-row"));
-                    var col = parseInt(input.attr("data-col"));
-                    CastleDBApp.updateCell(row, col, hex);
-                }
-            });
-        });
-        ');
+        addImageToBank(key, dataUrl);
+        
+        var row: Int = cast js.Lib.eval("parseInt(window.currentImagePickerRow)");
+        var col: Int = cast js.Lib.eval("parseInt(window.currentImagePickerCol)");
+        if (row != null && col != null) {
+            updateCell(row, col, key);
+        }
     }
     
     static function escapeHtml(s: String): String {

@@ -30,7 +30,7 @@ class BrowserClipboard {
 
 	public function get(format: String): String {
 		#if js
-		var text: Dynamic = untyped __js__('navigator.clipboard.readText()');
+		var text: Dynamic = js.Syntax.code("navigator.clipboard.readText()");
 		return text;
 		#else
 		return null;
@@ -39,7 +39,7 @@ class BrowserClipboard {
 
 	public function set(text: String, format: String): Void {
 		#if js
-		untyped __js__('navigator.clipboard.writeText({0})', text);
+		js.Syntax.code("navigator.clipboard.writeText({0})", text);
 		#end
 	}
 }
