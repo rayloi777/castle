@@ -1,0 +1,7 @@
+-cp src
+-cp .
+-cp /usr/local/lib/haxe/lib/hx3compat/git/std/
+-js bin/test-cdb.js
+-main test.TestParser
+-dce no
+-D js-es=6
