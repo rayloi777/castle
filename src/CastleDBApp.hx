@@ -1306,40 +1306,40 @@ class CastleDBApp {
             case TList:
                 var count = val != null && Std.isOfType(val, Array) ? val.length : 0;
                 var displayVal = "[" + count + " items]";
-                "<td><span class='edit-cell list-cell' " + inputAttrs + " style='cursor:pointer;color:#4A90D9;' onclick='openListEditor(" + rowIdx + ", " + colIdx + ")'>" + displayVal + "</span></td>";
+                return "<td><span class='edit-cell list-cell' " + inputAttrs + " style='cursor:pointer;color:#4A90D9;' onclick='openListEditor(" + rowIdx + ", " + colIdx + ")'>" + displayVal + "</span></td>";
             
             case TProperties:
                 var hasProps = val != null && Reflect.fields(val).length > 0;
                 var displayVal = hasProps ? "[" + Reflect.fields(val).length + " props]" : "[empty]";
-                "<td><span class='edit-cell props-cell' " + inputAttrs + " style='cursor:pointer;color:#4A90D9;' onclick='openPropsEditor(" + rowIdx + ", " + colIdx + ")'>" + displayVal + "</span></td>";
+                return "<td><span class='edit-cell props-cell' " + inputAttrs + " style='cursor:pointer;color:#4A90D9;' onclick='openPropsEditor(" + rowIdx + ", " + colIdx + ")'>" + displayVal + "</span></td>";
             
             case TGradient:
-                "<td><span class='edit-cell gradient-cell' " + inputAttrs + " style='cursor:pointer;color:#4A90D9;' onclick='openGradientEditor(" + rowIdx + ", " + colIdx + ")'>[Gradient]</span></td>";
+                return "<td><span class='edit-cell gradient-cell' " + inputAttrs + " style='cursor:pointer;color:#4A90D9;' onclick='openGradientEditor(" + rowIdx + ", " + colIdx + ")'>[Gradient]</span></td>";
             
             case TCurve:
-                "<td><span class='edit-cell curve-cell' " + inputAttrs + " style='cursor:pointer;color:#4A90D9;' onclick='openCurveEditor(" + rowIdx + ", " + colIdx + ")'>[Curve]</span></td>";
+                return "<td><span class='edit-cell curve-cell' " + inputAttrs + " style='cursor:pointer;color:#4A90D9;' onclick='openCurveEditor(" + rowIdx + ", " + colIdx + ")'>[Curve]</span></td>";
             
             case TInt, TFloat:
                 var numVal = val != null ? Std.string(val) : "";
-                "<td><input type='number' class='edit-cell' " + inputAttrs + " value='" + numVal + "' step='any'" + errorStyle + " /></td>";
+                return "<td><input type='number' class='edit-cell' " + inputAttrs + " value='" + numVal + "' step='any'" + errorStyle + " /></td>";
             
             case TId:
                 var strVal = val != null ? Std.string(val) : "";
-                "<td><input type='text' class='edit-cell id-cell' " + inputAttrs + " value='" + escapeHtml(strVal) + "' style='font-weight:bold;color:#1565C0;'" + errorStyle + " /></td>";
+                return "<td><input type='text' class='edit-cell id-cell' " + inputAttrs + " value='" + escapeHtml(strVal) + "' style='font-weight:bold;color:#1565C0;'" + errorStyle + " /></td>";
             
             case TImage:
                 var strVal = val != null ? Std.string(val) : "";
                 if (strVal != "" && strVal.indexOf(":") < 0) {
                     var imgData = getImageData(strVal);
                     if (imgData != null) {
-                        "<td><img src='" + imgData + "' class='image-preview' " + inputAttrs + " onclick='openImagePicker(" + rowIdx + "," + colIdx + ")' /></td>";
+                        return "<td><img src='" + imgData + "' class='image-preview' " + inputAttrs + " onclick='openImagePicker(" + rowIdx + "," + colIdx + ")' /></td>";
                     } else {
-                        "<td><span class='image-missing' " + inputAttrs + " onclick='openImagePicker(" + rowIdx + "," + colIdx + ")'>[Missing: " + escapeHtml(strVal) + "]</span></td>";
+                        return "<td><span class='image-missing' " + inputAttrs + " onclick='openImagePicker(" + rowIdx + "," + colIdx + ")'>[Missing: " + escapeHtml(strVal) + "]</span></td>";
                     }
                 } else if (strVal != "") {
-                    "<td><img src='" + escapeHtml(strVal) + "' class='image-preview' " + inputAttrs + " onclick='openImagePicker(" + rowIdx + "," + colIdx + ")' /></td>";
+                    return "<td><img src='" + escapeHtml(strVal) + "' class='image-preview' " + inputAttrs + " onclick='openImagePicker(" + rowIdx + "," + colIdx + ")' /></td>";
                 } else {
-                    "<td><button class='image-upload-btn' " + inputAttrs + " onclick='openImagePicker(" + rowIdx + "," + colIdx + ")'>+ Image</button></td>";
+                    return "<td><button class='image-upload-btn' " + inputAttrs + " onclick='openImagePicker(" + rowIdx + "," + colIdx + ")'>+ Image</button></td>";
                 }
             
             case TFile:
@@ -1348,19 +1348,19 @@ class CastleDBApp {
                 var isImage = (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "gif" || ext == "webp");
                 if (isImage && strVal != "") {
                     if (strVal.indexOf(":") >= 0) {
-                        "<td><img src='" + escapeHtml(strVal) + "' class='image-preview' /></td>";
+                        return "<td><img src='" + escapeHtml(strVal) + "' class='image-preview' /></td>";
                     } else {
-                        "<td><span class='file-path'>" + escapeHtml(strVal) + " <span style='color:#888'>(URL not supported)</span></span></td>";
+                        return "<td><span class='file-path'>" + escapeHtml(strVal) + " <span style='color:#888'>(URL not supported)</span></span></td>";
                     }
                 } else if (strVal != "") {
-                    "<td><span class='file-path'>" + escapeHtml(strVal) + "</span></td>";
+                    return "<td><span class='file-path'>" + escapeHtml(strVal) + "</span></td>";
                 } else {
-                    "<td><input type='text' class='edit-cell' " + inputAttrs + " value='' placeholder='file path'" + errorStyle + " /></td>";
+                    return "<td><input type='text' class='edit-cell' " + inputAttrs + " value='' placeholder='file path'" + errorStyle + " /></td>";
                 }
             
             default:
                 var strVal = val != null ? Std.string(val) : "";
-                "<td><input type='text' class='edit-cell' " + inputAttrs + " value='" + escapeHtml(strVal) + "'" + errorStyle + " /></td>";
+                return "<td><input type='text' class='edit-cell' " + inputAttrs + " value='" + escapeHtml(strVal) + "'" + errorStyle + " /></td>";
         }
     }
     
