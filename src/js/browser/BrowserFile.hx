@@ -57,7 +57,7 @@ class BrowserFile {
 		js.Syntax.code("setTimeout(function() { URL.revokeObjectURL({0}); a.remove(); }, 100)", url);
 	}
 
-	public static function saveBytes(bytes: js.html.ArrayBuffer, filename: String): Void {
+	public static function saveBytes(bytes: js.lib.ArrayBuffer, filename: String): Void {
 		var blob = new Blob([bytes], { type: "application/octet-stream" });
 		var url = URL.createObjectURL(blob);
 		var a : Dynamic = cast js.Browser.document.createElement("a");

@@ -48,6 +48,7 @@
 		#recent-files li { padding: 5px 0; }
 		#recent-files a { color: #4A90D9; cursor: pointer; }
 		#recent-files a:hover { text-decoration: underline; }
+		#recent-files .recent-file { color: #666; font-size: 12px; }
 		
 		.context-menu { position: absolute; background: white; border: 1px solid #ccc; box-shadow: 2px 2px 10px rgba(0,0,0,0.2); padding: 0; min-width: 160px; display: none; z-index: 1000; border-radius: 4px; }
 		.context-menu li { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee; list-style: none; font-size: 12px; }
@@ -143,6 +144,7 @@
 	</div>
 	
 	<input type="file" id="image-file-input" accept="image/*" style="display:none" onchange="handleImageFileSelect(this)">
+	<input type="file" id="file-path-input" style="display:none" onchange="handleFilePathSelect(this)">
 	
 	<div id="welcome">
 		<h1>Welcome to CastleDB</h1>
@@ -297,6 +299,13 @@
 			reader.readAsDataURL(file);
 		}
 		
+		function handleFilePathSelect(input) {
+			var file = input.files[0];
+			if (!file) return;
+			CastleDBApp.handleFilePath(file.name);
+			input.value = '';
+		}
+		
 		async function saveFile() {
 			var content = CastleDBApp.getCDBContent();
 			if (!content) return;
@@ -388,7 +397,9 @@
 				if (recent.length > 10) recent.pop();
 				localStorage.setItem('castle_recent', JSON.stringify(recent));
 				updateRecentList();
-			} catch(e) {}
+			} catch(e) {
+				console.error('Failed to add to recent files:', e);
+			}
 		}
 		
 		function updateRecentList() {
@@ -396,16 +407,14 @@
 				var recent = CastleDBApp.getRecentFiles();
 				if (recent && recent.length > 0) {
 					var html = recent.map(function(f) {
-						return '<li><a onclick="openRecent(\'' + f + '\')">' + f + '</a></li>';
+						return '<li><span class="recent-file">' + f + '</span></li>';
 					}).join('');
 					$('#recent-files').show();
 					$('#recent-list').html(html);
 				}
-			} catch(e) {}
-		}
-		
-		function openRecent(fileName) {
-			showToast('Please open the file manually: ' + fileName, 'info');
+			} catch(e) {
+				console.error('Failed to update recent list:', e);
+			}
 		}
 		
 		// ==================== Search/Filter ====================

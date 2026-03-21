@@ -192,7 +192,7 @@ class JqPage extends vdom.Server {
 					BrowserFile.saveFile(data, suggestedName);
 				else if( Std.is(data, haxe.io.Bytes) ) {
 					var bytes : haxe.io.Bytes = data;
-					var ab = new js.html.ArrayBuffer(bytes.length);
+					var ab = new js.lib.ArrayBuffer(bytes.length);
 					var view = new js.lib.Uint8Array(ab);
 					for( i in 0...bytes.length )
 						view[i] = bytes.get(i);
