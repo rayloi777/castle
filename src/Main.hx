@@ -680,6 +680,10 @@ class Main extends Model {
 			var str = Std.string(v).split("\n").join(" ").split("\t").join("");
 			if( str.length > 50 ) str = str.substr(0, 47) + "...";
 			str;
+		default:
+			var str = Std.string(v).split("\n").join(" ").split("\t").join("");
+			if( str.length > 50 ) str = str.substr(0, 47) + "...";
+			str;
 		}
 	}
 
@@ -693,41 +697,47 @@ class Main extends Model {
 		var nref = new MenuItem( { label : "Show References" } );
 		for( m in [nup, ndown, nins, ndel, nsep, nref] )
 			n.append(m);
-		var sepIndex = Lambda.indexOf(sheet.separators, index);
+		var sepIndex = -1;
+		for( i in 0...sheet.separators.length ) {
+			if( sheet.separators[i].index == index ) {
+				sepIndex = i;
+				break;
+			}
+		}
 		nsep.checked = sepIndex >= 0;
-		nins.click = function() {
+		nins.click = function(_) {
 			newLine(sheet, index);
 		};
-		nup.click = function() {
+		nup.click = function(_) {
 			moveLine(sheet, index, -1);
 		};
-		ndown.click = function() {
+		ndown.click = function(_) {
 			moveLine(sheet, index, 1);
 		};
-		ndel.click = function() {
+		ndel.click = function(_) {
 			sheet.deleteLine(index);
 			refresh();
 			save();
 		};
-		nsep.click = function() {
+		nsep.click = function(_) {
 			if( sepIndex >= 0 ) {
 				sheet.separators.splice(sepIndex, 1);
 				if( sheet.props.separatorTitles != null ) sheet.props.separatorTitles.splice(sepIndex, 1);
 			} else {
 				sepIndex = sheet.separators.length;
 				for( i in 0...sheet.separators.length )
-					if( sheet.separators[i] > index ) {
+					if( sheet.separators[i].index > index ) {
 						sepIndex = i;
 						break;
 					}
-				sheet.separators.insert(sepIndex, index);
+				sheet.separators.insert(sepIndex, { index : index });
 				if( sheet.props.separatorTitles != null && sheet.props.separatorTitles.length > sepIndex )
 					sheet.props.separatorTitles.insert(sepIndex, null);
 			}
 			refresh();
 			save();
 		};
-		nref.click = function() {
+		nref.click = function(_) {
 			showReferences(sheet, index);
 		};
 		if( sheet.props.hide )
@@ -758,7 +768,7 @@ class Main extends Model {
 				{ n : "lowerIdent", f : function(s:String) return s.substr(0, 1).toLowerCase() + s.substr(1) },
 			] ) {
 				var m = new MenuItem( { label : k.n } );
-				m.click = function() {
+				m.click = function(_) {
 
 					switch( c.type ) {
 					case TEnum(values), TFlags(values):
@@ -803,7 +813,7 @@ class Main extends Model {
 				{ n : "- 1", f : function(s:Float) return s - 1 },
 			] ) {
 				var m = new MenuItem( { label : k.n } );
-				m.click = function() {
+				m.click = function(_) {
 					for( obj in sheet.getLines() ) {
 						var t = Reflect.field(obj, c.name);
 						if( t != null ) {
@@ -835,10 +845,10 @@ class Main extends Model {
 		default:
 		}
 
-		nedit.click = function() {
+		nedit.click = function(_) {
 			newColumn(sheet.name, c);
 		};
-		nleft.click = function() {
+		nleft.click = function(_) {
 			var index = Lambda.indexOf(sheet.columns, c);
 			if( index > 0 ) {
 				sheet.columns.remove(c);
@@ -847,7 +857,7 @@ class Main extends Model {
 				save();
 			}
 		};
-		nright.click = function() {
+		nright.click = function(_) {
 			var index = Lambda.indexOf(sheet.columns, c);
 			if( index < sheet.columns.length - 1 ) {
 				sheet.columns.remove(c);
@@ -856,11 +866,11 @@ class Main extends Model {
 				save();
 			}
 		}
-		ndel.click = function() {
+		ndel.click = function(_) {
 			if( !isProperties || js.Browser.window.confirm("Do you really want to delete this property for all objects?") )
 				deleteColumn(sheet, c.name);
 		};
-		ndisp.click = function() {
+		ndisp.click = function(_) {
 			if( sheet.props.displayColumn == c.name ) {
 				sheet.props.displayColumn = null;
 			} else {
@@ -870,7 +880,7 @@ class Main extends Model {
 			refresh();
 			save();
 		};
-		nicon.click = function() {
+		nicon.click = function(_) {
 			if( sheet.props.displayIcon == c.name ) {
 				sheet.props.displayIcon = null;
 			} else {
@@ -880,7 +890,7 @@ class Main extends Model {
 			refresh();
 			save();
 		};
-		nins.click = function() {
+		nins.click = function(_) {
 			newColumn(sheet.name, Lambda.indexOf(sheet.columns,c) + 1);
 		};
 		n.popup(mousePos.x, mousePos.y);
@@ -898,7 +908,7 @@ class Main extends Model {
 		var ngroup = new MenuItem( { label : "Add Group", type : MenuItemType.checkbox } );
 		for( m in [nins, nleft, nright, nren, ndel, nindex, ngroup] )
 			n.append(m);
-		nleft.click = function() {
+		nleft.click = function(_) {
 			var prev = -1;
 			for( i in 0...base.sheets.length ) {
 				var s2 = base.sheets[i];
@@ -913,7 +923,7 @@ class Main extends Model {
 			initContent();
 			save();
 		};
-		nright.click = function() {
+		nright.click = function(_) {
 			var sheets = [for( s in base.sheets ) if( !s.props.hide ) s];
 			var index = sheets.indexOf(s);
 			var next = sheets[index+1];
@@ -940,16 +950,16 @@ class Main extends Model {
 			initContent();
 			save();
 		}
-		ndel.click = function() {
+		ndel.click = function(_) {
 			base.deleteSheet(s);
 			initContent();
 			save();
 		};
-		nins.click = function() {
+		nins.click = function(_) {
 			newSheet();
 		};
 		nindex.checked = s.props.hasIndex;
-		nindex.click = function() {
+		nindex.click = function(_) {
 			if( s.props.hasIndex ) {
 				for( o in s.getLines() )
 					Reflect.deleteField(o, "index");
@@ -965,7 +975,7 @@ class Main extends Model {
 			save();
 		};
 		ngroup.checked = s.props.hasGroup;
-		ngroup.click = function() {
+		ngroup.click = function(_) {
 			if( s.props.hasGroup ) {
 				for( o in s.getLines() )
 					Reflect.deleteField(o, "group");
@@ -980,14 +990,14 @@ class Main extends Model {
 			}
 			save();
 		};
-		nren.click = function() {
+		nren.click = function(_) {
 			li.dblclick();
 		};
 		if( s.isLevel() || (s.hasColumn("width", [TInt]) && s.hasColumn("height", [TInt]) && s.hasColumn("props",[TDynamic])) ) {
 			var nlevel = new MenuItem( { label : "Level", type : MenuItemType.checkbox } );
 			nlevel.checked = s.isLevel();
 			n.append(nlevel);
-			nlevel.click = function() {
+			nlevel.click = function(_) {
 				if( s.isLevel() )
 					Reflect.deleteField(s.props, "level");
 				else
@@ -1303,6 +1313,8 @@ class Main extends Model {
 			});
 		case TList, TLayer(_), TTilePos, TProperties:
 			throw "assert2";
+		case TCurve, TGradient, TGuid, TPolymorph:
+			return;
 		}
 	}
 
@@ -1913,7 +1925,7 @@ class Main extends Model {
 
 		var snext = 0;
 		for( i in 0...lines.length ) {
-			while( sheet.separators[snext] == i ) {
+			while( sheet.separators[snext].index == i ) {
 				var sep = J("<tr>").addClass("separator").append('<td colspan="${colCount+1}">').appendTo(content);
 				var content = sep.find("td");
 				var title = if( sheet.props.separatorTitles != null ) sheet.props.separatorTitles[snext] else null;
@@ -2452,19 +2464,17 @@ class Main extends Model {
 		var mclean = new MenuItem( { label : "Clean Images" } );
 		var mexport = new MenuItem( { label : "Export Localized texts" } );
 		mcompress = new MenuItem( { label : "Enable Compression", type : MenuItemType.checkbox } );
-		mcompress.click = function() {
+		mcompress.click = function(_) {
 			base.compress = mcompress.checked;
 			save();
 		};
 		var mabout = new MenuItem( { label : "About" } );
 		var mexit = new MenuItem( { label : "Exit", key : "Q", modifiers : modifier } );
-		var mdebug = new MenuItem( { label : "Dev" } );
-		mnew.click = function() {
+		mnew.click = function(_) {
 			prefs.curFile = null;
 			load(true);
 		};
-		mdebug.click = function() window.showDevTools();
-		mopen.click = function() {
+		mopen.click = function(_) {
 			var i = J("<input>").attr("type", "file").css("display","none").change(function(e) {
 				var j = JTHIS;
 				prefs.curFile = j.val();
@@ -2474,7 +2484,7 @@ class Main extends Model {
 			i.appendTo(J("body"));
 			i.click();
 		};
-		msave.click = function() {
+		msave.click = function(_) {
 			var i = J("<input>").attr("type", "file").attr("nwsaveas","new.cdb").css("display","none").change(function(e) {
 				var j = JTHIS;
 				prefs.curFile = j.val();
@@ -2484,7 +2494,7 @@ class Main extends Model {
 			i.appendTo(J("body"));
 			i.click();
 		};
-		mclean.click = function() {
+		mclean.click = function(_) {
 			var lcount = @:privateAccess base.cleanLayers();
 			var icount = 0;
 			if( imageBank != null ) {
@@ -2502,8 +2512,8 @@ class Main extends Model {
 			if( lcount > 0 ) save();
 			if( icount > 0 ) saveImages();
 		};
-		mexit.click = function() Sys.exit(0);
-		mabout.click = function() {
+		mexit.click = function(_) Sys.exit(0);
+		mabout.click = function(_) {
 			J("#about").show();
 		};
 
@@ -2511,7 +2521,7 @@ class Main extends Model {
 		for( file in prefs.recent ) {
 			if( file == null ) continue;
 			var m = new MenuItem( { label : file } );
-			m.click = function() {
+			m.click = function(_) {
 				prefs.curFile = file;
 				load();
 			};
@@ -2523,7 +2533,7 @@ class Main extends Model {
 			mfiles.append(m);
 		mfile.submenu = mfiles;
 
-		mexport.click = function() {
+		mexport.click = function(_) {
 
 			var lang = new cdb.Lang(@:privateAccess base.data);
 			var xml = lang.buildXML();
@@ -2544,11 +2554,9 @@ class Main extends Model {
 			macEditMenu = menu.items[0]; // save default edit menu
 			menu.removeAt(0); // remove default edit menu
 			menu.insert(mfile, 0); // put it before the default Edit menu
-			mfiles.insert(mdebug, 7); // needs to go under File or it won't show
 		}
 		else {
 			menu.append(mfile);
-			menu.append(mdebug);
 		}
 
 		window.menu = menu;
@@ -2556,7 +2564,7 @@ class Main extends Model {
 		if( prefs.windowPos.w > 50 && prefs.windowPos.h > 50 ) window.resizeTo(prefs.windowPos.w, prefs.windowPos.h);
 		window.show();
 		if( prefs.windowPos.max ) window.maximize();
-		window.on('close', function() {
+		window.on('close', function(_) {
 			if( prefs.curFile == null && base.sheets.length > 0 ) {
 				if( !js.Browser.window.confirm("Do you want to exit without saving your changes?") )
 					return;
@@ -2572,10 +2580,10 @@ class Main extends Model {
 			savePrefs();
 			window.close(true);
 		});
-		window.on('maximize', function() {
+		window.on('maximize', function(_) {
 			prefs.windowPos.max = true;
 		});
-		window.on('unmaximize', function() {
+		window.on('unmaximize', function(_) {
 			prefs.windowPos.max = false;
 		});
 	}

@@ -15,13 +15,12 @@
  */
 package sys.io;
 
+#if !nodejs
 import js.browser.BrowserFile;
 
 @:expose
 class File {
 	public static function getContent(path: String): String {
-		// In browser, this is handled differently - use BrowserFile.openFile
-		// This is a synchronous placeholder - actual loading is async
 		throw "sys.io.File.getContent is not available in browser. Use BrowserFile.openFile instead.";
 	}
 
@@ -72,3 +71,4 @@ class FileOutput {
 	public function writeBytes(s: haxe.io.Bytes, pos: Int, len: Int): Int { return 0; }
 	public function flush(): Void {}
 }
+#end

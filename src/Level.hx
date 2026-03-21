@@ -586,7 +586,7 @@ class Level {
 		var nrename = new MenuItem( { label : "Rename" } );
 		for( m in [nshow, nshowAll, nrename, nclear, ndel] )
 			n.append(m);
-		nclear.click = function() {
+		nclear.click = function(_) {
 			switch( l.data ) {
 			case Tiles(_, data):
 				for( i in 0...data.length )
@@ -604,27 +604,27 @@ class Level {
 			draw();
 		};
 		ndel.enabled = l.listColumnn != null;
-		ndel.click = function() {
+		ndel.click = function(_) {
 			var layers : Array<Dynamic> = Reflect.field(obj, l.listColumnn.name);
 			layers.remove(l.targetObj.o);
 			save();
 			reload();
 		};
-		nshow.click = function() {
+		nshow.click = function(_) {
 			for( l2 in layers ) {
 				l2.visible = l == l2;
 				l2.saveState();
 			}
 			draw();
 		};
-		nshowAll.click = function() {
+		nshowAll.click = function(_) {
 			for( l2 in layers ) {
 				l2.visible = true;
 				l2.saveState();
 			}
 			draw();
 		};
-		nrename.click = function() {
+		nrename.click = function(_) {
 			l.comp.find("span").remove();
 			l.comp.prepend(J("<input type='text'>").val(l.name).focus().blur(function(_) {
 				var n = StringTools.trim(JTHIS.val());

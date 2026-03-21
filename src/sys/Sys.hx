@@ -9,20 +9,19 @@
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
  * SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
- * IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ * WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ * ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 package sys;
 
 @:expose
 class Sys {
 	public static function print(v: Dynamic): Void {
-		js.Syntax.code("console.log(String({0}))", Std.string(v));
+		#if !macro js.Syntax.code("console.log(String({0}))", Std.string(v)); #end
 	}
 
 	public static function println(v: Dynamic): Void {
-		js.Syntax.code("console.log(String({0}))", Std.string(v));
+		#if !macro js.Syntax.code("console.log(String({0}))", Std.string(v)); #end
 	}
 
 	public static function args(): Array<String> {
@@ -30,15 +29,14 @@ class Sys {
 	}
 
 	public static function getEnv(s: String): String {
-		return js.Syntax.code("process.env[s]");
+		#if !macro return js.Syntax.code("process.env[{0}]", s); #else return ""; #end
 	}
 
 	public static function putEnv(s: String, v: Null<String>): Void {
-		// Cannot set environment variables in browser
 	}
 
 	public static function systemName(): String {
-		#if js
+		#if !macro
 		var platform: String = js.Syntax.code("navigator.platform");
 		if (platform.indexOf("Mac") >= 0) return "Mac";
 		if (platform.indexOf("Win") >= 0) return "Windows";
@@ -66,7 +64,6 @@ class Sys {
 	}
 
 	public static function setCwd(s: String): Void {
-		// Cannot change directory in browser
 	}
 
 	public static function setTimeLocale(loc: String): Bool {
@@ -78,7 +75,6 @@ class Sys {
 	}
 
 	public static function sleep(seconds: Float): Void {
-		// Cannot sleep in browser
 	}
 
 	public static function stdin(): haxe.io.Input {
@@ -98,7 +94,7 @@ class Sys {
 	}
 
 	public static function programPath(): String {
-		return js.Syntax.code("window.location.href");
+		#if !macro return js.Syntax.code("window.location.href"); #else return ""; #end
 	}
 
 	public static function environment(): Map<String, String> {

@@ -48,11 +48,11 @@ class BrowserFile {
 	public static function saveFile(content: String, filename: String): Void {
 		var blob = new Blob([content], { type: "text/plain;charset=utf-8" });
 		var url = URL.createObjectURL(blob);
-		var a = cast js.Browser.document.createElement("a");
+		var a : Dynamic = cast js.Browser.document.createElement("a");
 		a.href = url;
 		a.download = filename;
 		a.style.display = "none";
-		js.Browser.document.body.appendChild(a);
+		js.Browser.document.body.appendChild(cast a);
 		a.click();
 		js.Browser.setTimeout(function() {
 			URL.revokeObjectURL(url);
@@ -63,11 +63,11 @@ class BrowserFile {
 	public static function saveBytes(bytes: js.html.ArrayBuffer, filename: String): Void {
 		var blob = new Blob([bytes], { type: "application/octet-stream" });
 		var url = URL.createObjectURL(blob);
-		var a = cast js.Browser.document.createElement("a");
+		var a : Dynamic = cast js.Browser.document.createElement("a");
 		a.href = url;
 		a.download = filename;
 		a.style.display = "none";
-		js.Browser.document.body.appendChild(a);
+		js.Browser.document.body.appendChild(cast a);
 		a.click();
 		js.Browser.setTimeout(function() {
 			URL.revokeObjectURL(url);

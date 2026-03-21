@@ -4,9 +4,11 @@
 
 CastleDB is a Haxe library for structured database editing. Source code uses `.hx` files and targets JavaScript (node.js/web) and HashLink.
 
+**Browser Version**: A full-featured browser-based editor that works on all platforms including macOS ARM64, using the File System Access API for direct file read/write.
+
 ## Build Commands
 
-### Build
+### Build (Desktop NWJS)
 ```bash
 haxe castle.hxml
 ```
@@ -29,57 +31,9 @@ haxe test-hl.hxml && ../../hashlink/hl test.hl
 haxelib install castle.hxml
 ```
 
-### macOS ARM64 Build (Legacy NWJS Editor)
+### Browser Version Build (Recommended for macOS ARM64)
 
-The main editor uses NWJS (node-webkit) which only has x64 binaries. On Apple Silicon (ARM64), use Rosetta 2 translation.
-
-1. **Register castle as dev library:**
-```bash
-haxelib dev castle /path/to/castle
-```
-
-2. **Download NWJS:**
-```bash
-cd bin
-curl -L -o nwjs.zip "https://dl.nwjs.io/v0.87.0/nwjs-v0.87.0-osx-x64.zip"
-unzip -q nwjs.zip
-mv nwjs-v0.87.0-osx-x64/nwjs.app ./
-rm nwjs.zip
-mkdir -p nwjs.app/Contents/Resources/app.nw
-```
-
-3. **Build castle.js** (requires workaround for hxnodejs sys package):
-```bash
-cat > /tmp/build-js.hxml << 'EOF'
---macro allowPackage('sys')
---macro define('nodejs')
---macro _internal.SuppressDeprecated.run()
--cp src
--js bin/castle.js
--main Main
--cp /usr/local/lib/haxe/lib/hxnodejs/git/src/
--cp /usr/local/lib/haxe/lib/hx3compat/git/std/
--cp /usr/local/lib/haxe/lib/format/3,8,0/
--cp /usr/local/lib/haxe/lib/hxbit/1,5,0/
--D hxnodejs=12.2.0
--D lz4js
-EOF
-haxe /tmp/build-js.hxml
-```
-
-4. **Copy files to app.nw:**
-```bash
-cp -R bin/cdb.cmd bin/dock bin/icon.* bin/index.html bin/libs bin/package.json bin/Release.hx bin/style.* bin/castle.js bin/nwjs.app/Contents/Resources/app.nw/
-```
-
-5. **Run via Rosetta 2:**
-```bash
-open bin/nwjs.app
-```
-
-### Browser Version Build
-
-For a browser-based version that works on all platforms (including macOS ARM64):
+The browser version provides full sheet editing functionality without requiring NWJS:
 
 1. **Build the browser version:**
 ```bash
@@ -97,23 +51,88 @@ python3 -m http.server 8080
 3. **Open in browser:**
 Navigate to `http://localhost:8080/index-browser.html`
 
-The browser version provides basic sheet editing functionality:
-- Open/Save .cdb files
+**Browser Version Features:**
+- Open/Save .cdb files using File System Access API
 - Create new sheets and columns
 - Add/Delete rows
-- Basic data editing
+- Edit all column types (string, int, float, bool, enum, color, image, etc.)
+- Undo/Redo support
+- Search/Filter rows
+- Column context menu (rename, delete, move, convert type)
+- Row context menu (duplicate, insert, delete, separator)
+- Sheet tabs with context menu
+- Image upload to localStorage image bank
+- Color picker with alpha channel (spectrum-colorpicker2)
+- Gradient and Curve editors
+- Keyboard shortcuts (Ctrl+S/Z/Y/F, Delete, Escape)
 
-Note: The browser version does not include the Level Editor functionality.
+**Browser Limitations:**
+- Does not include the Level Editor functionality
+- Requires HTTPS or localhost for File System Access API
+
+### macOS ARM64 Build (NWJS v0.109.0)
+
+NW.js v0.109.0 provides **native ARM64 support** for macOS without Rosetta 2 translation.
+
+**Known Issues:**
+- `nwsaveas` (Save As dialog) may crash on ARM64 (Issue #8334) - fallback to blob download is implemented
+- Dev Tools menu is removed due to crash on ARM64 (Issue #8302)
+
+1. **Download NWJS v0.109.0 ARM64:**
+```bash
+cd bin
+# Backup old version if exists
+mv nwjs.app nwjs.app.v78.bak 2>/dev/null || true
+
+# Download ARM64 build
+curl -L -o nwjs.zip "https://dl.nwjs.io/v0.109.0/nwjs-v0.109.0-osx-arm64.zip"
+unzip -q nwjs.zip
+mv nwjs-v0.109.0-osx-arm64/nwjs.app ./
+rm nwjs.zip
+mkdir -p nwjs.app/Contents/Resources/app.nw
+```
+
+2. **Build castle.js:**
+```bash
+haxe castle.hxml
+```
+
+3. **Copy files to app.nw:**
+```bash
+cp -R bin/cdb.cmd bin/dock bin/icon.* bin/index.html bin/libs bin/package.json bin/Release.hx bin/style.* bin/castle.js bin/nwjs.app/Contents/Resources/app.nw/
+```
+
+4. **Fix extended attributes** (prevents "app is damaged" error):
+```bash
+xattr -cr bin/nwjs.app
+```
+
+5. **Run:**
+```bash
+open bin/nwjs.app
+```
+
+**ARM64 Behavior:**
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Open File | ✅ Works | Standard HTML file dialog |
+| Save | ⚠️ Fallback | Uses blob download to Downloads folder |
+| Export XML | ⚠️ Fallback | Uses blob download |
+| Dev Tools | ❌ Removed | Crashes on ARM64 |
+| Other features | ✅ Works | Full functionality |
 
 ## Code Style
 
 ### File Structure
 ```
 /cdb/          - Core database library (Database, Sheet, Types, Parser, etc.)
-/src/          - Main application entry point (Main.hx)
+/src/          - Main application entry point (Main.hx, CastleDBApp.hx)
 /src/lvl/      - Level editor functionality
 /src/js/       - JavaScript/nodewebkit bindings
+/src/sys/      - Browser sys stubs for cross-platform compatibility
 /src/test/     - Unit tests using haxe.unit
+/test/         - Test database files (*.cdb)
+/bin/          - Build output and browser version files
 ```
 
 ### Copyright Header
@@ -178,6 +197,17 @@ import js.node.webkit.Menu;
   ```
 - Use `inline` functions for performance-critical or trivial accessors
 - Use `cast` for type assertions when type system requires it
+
+### JavaScript Interop
+For browser compatibility, use `js.Syntax.code()` instead of deprecated `untyped __js__()`:
+```haxe
+// Correct - use js.Syntax.code with placeholders
+js.Syntax.code("window.myVar = {0}", value);
+js.Syntax.code("console.log({0})", message);
+
+// Avoid - deprecated
+untyped __js__("window.myVar = value");
+```
 
 ### Error Handling
 - Use `throw "message"` for assertion failures and unrecoverable errors
@@ -249,6 +279,16 @@ import js.node.webkit.Menu;
 -D lz4js             LZ4 compression for JS
 ```
 
+### Browser build (build-browser.hxml)
+```
+-cp src              Source path
+-cp .                Root for MainBrowser
+-js bin/castle-browser.js
+-main MainBrowser     Browser entry point
+-cp /usr/local/lib/haxe/lib/hx3compat/git/std/
+-D js-es=6           ES6 JavaScript output
+```
+
 ### Test build (test-js.hxml)
 ```
 -lib castle          Local castle library
@@ -293,3 +333,56 @@ Use `Reflect.field()` and `Reflect.setField()` for dynamic property access. Use 
     if (!succeed) throw "failed";
 #end
 ```
+
+## CDB File Format
+
+### Column Type Index
+When creating CDB files programmatically, use these type indices:
+- `0` = TId (unique identifier)
+- `1` = TString (text)
+- `2` = TBool (boolean)
+- `3` = TInt (integer)
+- `4` = TFloat (float/double)
+- `5:values` = TEnum (comma-separated values)
+- `6:refSheet` = TRef (reference to another sheet)
+- `7` = TImage
+- `8` = TList
+- `9:values` = TCustom/custom type
+- `10:values` = TFlags (bitfield flags)
+- `11` = TColor
+- `12:layerType` = TLayer
+- `13` = TFile
+- `14` = TTilePos
+- `15` = TTileLayer
+- `16` = TDynamic
+- `17` = TProperties
+- `18` = TGradient
+- `19` = TCurve
+- `20` = TGuid
+- `21` = TPolymorph
+
+### CDB JSON Structure
+```json
+{
+  "sheets": [
+    {
+      "name": "SheetName",
+      "columns": [
+        {"Name": "id", "typeStr": "0", "opt": false},
+        {"Name": "name", "typeStr": "1", "opt": false},
+        {"Name": "type", "typeStr": "5:value1,value2,value3", "opt": false}
+      ],
+      "lines": [
+        {"id": "001", "name": "Item 1", "type": "value1"},
+        {"id": "002", "name": "Item 2", "type": "value2"}
+      ],
+      "props": {"displayColumn": "name"},
+      "separators": []
+    }
+  ],
+  "customTypes": [],
+  "compress": false
+}
+```
+
+Note: Use `typeStr` (string) not `type` (integer) for column definitions.

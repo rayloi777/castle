@@ -124,4 +124,10 @@ class Menu {
 	public static inline function createWindowMenu(): Menu {
 		return new Menu({ type: "menubar" });
 	}
+
+	public function createMacBuiltin(name: String, ?opts: Dynamic): Void {
+	#if !nwjs
+		throw "createMacBuiltin is only available in NW.js";
+	#end
+	}
 }

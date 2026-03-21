@@ -1,8 +1,12 @@
 -cp src
+-cp /usr/local/lib/haxe/lib/hxnodejs/git/src/
+-cp /usr/local/lib/haxe/lib/hx3compat/git/std/
+-cp /usr/local/lib/haxe/lib/format/3,8,0/
+-cp /usr/local/lib/haxe/lib/hxbit/1,5,0/
 -js bin/castle.js
 -main Main
--lib hxnodejs
--lib hx3compat
--lib format
--lib hxbit
 -D lz4js
+-D nwjs
+-D hxnodejs
+-D nodejs
+--macro haxe.macro.Compiler.allowPackage("sys")

@@ -14,6 +14,7 @@
  * IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 import js.jquery.Helper.*;
+import js.browser.BrowserFile;
 
 extern class DockNode {
 	var elementPanel : js.html.HtmlElement;
@@ -179,7 +180,23 @@ class JqPage extends vdom.Server {
 				}
 				fs.attr("nwworkingdir", "");
 				result(path);
-			}).click();
+			});
+			#if nwjs
+			// ARM64 nwsaveas crash fallback (Issue #8334)
+			try {
+				fs.click();
+			} catch(e:Dynamic) {
+				// Fallback: use blob download when nwsaveas crashes on ARM64
+				var suggestedName = fpath.file != null && fpath.file.length > 0 ? fpath.file : "data.cdb";
+				if( Std.is(data, String) )
+					BrowserFile.saveFile(data, suggestedName);
+				else if( Std.is(data, haxe.io.Bytes) )
+					BrowserFile.saveBytes(data, suggestedName);
+				result(null);
+			}
+			#else
+			fs.click();
+			#end
 
 		case "animate":
 
@@ -198,7 +215,7 @@ class JqPage extends vdom.Server {
 			for( i in 0...args.length ) {
 				var mit = new js.node.webkit.MenuItem( { label : args[i] } );
 				n.append(mit);
-				mit.click = function() result(i);
+				mit.click = function(_) result(i);
 			}
 			@:privateAccess n.popup(Main.inst.mousePos.x, Main.inst.mousePos.y);
 
