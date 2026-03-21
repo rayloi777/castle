@@ -85,6 +85,10 @@ class Level {
 
 	static var loadedTilesCache = new Map< String, { pending : Array < Int->Int->Array<lvl.Image>->Array<Bool>->Void >, data : { w : Int, h : Int, img : Array<lvl.Image>, blanks : Array<Bool> }} >();
 
+	public static function clearTileCache() {
+		loadedTilesCache = new Map();
+	}
+
 	public function new( model : Model, sheet : Sheet, index : Int ) {
 		this.sheet = sheet;
 		this.sheetPath = sheet.getPath();

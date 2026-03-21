@@ -187,9 +187,14 @@ class Model {
 				default:
 				}
 			}
+		var hasChanges = false;
 		for( f in Reflect.fields(imageBank) )
-			if( !used.get(f) )
+			if( !used.get(f) ) {
 				Reflect.deleteField(imageBank, f);
+				hasChanges = true;
+			}
+		if( hasChanges )
+			saveImageBank();
 	}
 
 	function loadPrefs() {

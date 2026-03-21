@@ -1196,7 +1196,7 @@ class Main extends Model {
 				case K.TAB:
 					i.blur();
 					moveCursor(e.shiftKey? -1:1, 0, false, false);
-					haxe.Timer.delay(function() J(".cursor").dblclick(), 1);
+					haxe.Timer.delay(function() J(".cursor").dblclick(), 10);
 					e.preventDefault();
 				default:
 				}
@@ -2632,7 +2632,17 @@ class Main extends Model {
 				j.remove();
 			});
 			i.appendTo(J("body"));
+			#if nwjs
+			try {
+				i.click();
+			} catch(e: Dynamic) {
+				var suggestedName = prefs.curFile != null ? prefs.curFile.split("/").pop().split("\\").pop() : "data.cdb";
+				var content = cdb.Parser.save(@:privateAccess base.data);
+				js.browser.BrowserFile.saveFile(content, suggestedName);
+			}
+			#else
 			i.click();
+			#end
 		};
 		mclean.click = function(_) {
 			var lcount = @:privateAccess base.cleanLayers();
@@ -2674,7 +2684,6 @@ class Main extends Model {
 		mfile.submenu = mfiles;
 
 		mexport.click = function(_) {
-
 			var lang = new cdb.Lang(@:privateAccess base.data);
 			var xml = lang.buildXML();
 			var i = J("<input>").attr("type", "file").attr("nwsaveas","export.xml").css("display","none").change(function(e) {
@@ -2684,8 +2693,15 @@ class Main extends Model {
 				j.remove();
 			});
 			i.appendTo(J("body"));
+			#if nwjs
+			try {
+				i.click();
+			} catch(e: Dynamic) {
+				js.browser.BrowserFile.saveFile(String.fromCharCode(0xFEFF)+xml, "export.xml");
+			}
+			#else
 			i.click();
-
+			#end
 		};
 
 		if(Sys.systemName().indexOf("Mac") != -1) {
@@ -2748,6 +2764,7 @@ class Main extends Model {
 
 		lastSave = getFileTime();
 		super.load(noError);
+		Level.clearTileCache();
 
 		J("#welcome").hide();
 		initContent();

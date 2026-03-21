@@ -1353,9 +1353,9 @@ class CastleDBApp {
                         return "<td><span class='file-path'>" + escapeHtml(strVal) + " <span style='color:#888'>(URL not supported)</span></span></td>";
                     }
                 } else if (strVal != "") {
-                    return "<td><span class='file-path'>" + escapeHtml(strVal) + "</span></td>";
+                    return "<td><span class='file-path'>" + escapeHtml(strVal) + "</span> <button class='file-pick-btn' onclick='openFilePicker(" + rowIdx + ", " + colIdx + ")'>Browse</button></td>";
                 } else {
-                    return "<td><input type='text' class='edit-cell' " + inputAttrs + " value='' placeholder='file path'" + errorStyle + " /></td>";
+                    return "<td><button class='file-pick-btn' onclick='openFilePicker(" + rowIdx + ", " + colIdx + ")'>+ File</button></td>";
                 }
             
             default:
@@ -1375,6 +1375,22 @@ class CastleDBApp {
         js.Syntax.code("window.currentImagePickerRow = {0}", rowIndex);
         js.Syntax.code("window.currentImagePickerCol = {0}", colIndex);
         js.Syntax.code("document.getElementById(\"image-file-input\").click()");
+    }
+    
+    @:expose
+    public static function openFilePicker(rowIndex: Int, colIndex: Int): Void {
+        js.Syntax.code("window.currentFilePickerRow = {0}", rowIndex);
+        js.Syntax.code("window.currentFilePickerCol = {0}", colIndex);
+        js.Syntax.code("document.getElementById(\"file-path-input\").click()");
+    }
+    
+    @:expose
+    public static function handleFilePath(path: String): Void {
+        var row: Int = cast js.Lib.eval("parseInt(window.currentFilePickerRow)");
+        var col: Int = cast js.Lib.eval("parseInt(window.currentFilePickerCol)");
+        if (row != null && col != null && path != null && path != "") {
+            updateCell(row, col, path);
+        }
     }
     
     @:expose
