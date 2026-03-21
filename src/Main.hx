@@ -246,7 +246,17 @@ class Main extends Model {
 	}
 
 	function actionSaveAs() {
+		#if nwjs
+		try {
+			J("#fileSaveAs").click();
+		} catch(e: Dynamic) {
+			var suggestedName = prefs.curFile != null ? prefs.curFile.split("/").pop().split("\\").pop() : "data.cdb";
+			var content = cdb.Parser.save(@:privateAccess base.data);
+			js.browser.BrowserFile.saveFile(content, suggestedName);
+		}
+		#else
 		J("#fileSaveAs").click();
+		#end
 	}
 
 	function searchFilter( filter : String ) {
