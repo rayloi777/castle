@@ -178,8 +178,12 @@ class Main extends Model {
 				list.append(li);
 			}
 		}
-		J("#welcome-new").click(function(_) { actionNew(); });
-		J("#welcome-open").click(function(_) { actionOpen(); });
+		J("#welcome-new").click(function(_) { 
+			actionNew(); 
+		});
+		J("#welcome-open").click(function(_) { 
+			actionOpen(); 
+		});
 		J("#fileOpen").change(function(e) {
 			var file = JTHIS.val();
 			if( file != "" ) {
@@ -2552,7 +2556,7 @@ class Main extends Model {
 		pages.updateTabs();
 		var s = base.sheets[prefs.curSheet];
 		if( s == null ) s = base.sheets[0];
-		if( s != null ) selectSheet(s, false);
+		if( s != null ) selectSheet(s, true);
 
 		var old = levels;
 		var lcur = null;
@@ -2571,14 +2575,18 @@ class Main extends Model {
 			li.text(name).attr("id", "level_" + l.sheetPath.split(".").join("_") + "_" + l.index).appendTo(sheets).click(function(_) selectLevel(l));
 		}
 
-		if( pages.curPage >= 0 )
+		if( pages.curPage >= 0 ) {
 			pages.select();
-		else if( lcur != null )
+		}
+		else if( lcur != null ) {
 			selectLevel(lcur);
-		else if( base.sheets.length == 0 )
+		}
+		else if( base.sheets.length == 0 ) {
 			J("#content").html("<a href='javascript:_.newSheet()'>Create a sheet</a>");
-		else
+		}
+		else {
 			refresh();
+		}
 	}
 
 	function initMenu() {
@@ -2733,7 +2741,6 @@ class Main extends Model {
 	}
 
 	override function load(noError = false) {
-
 		if( sys.FileSystem.exists(prefs.curFile+".mine") && !Resolver.resolveConflict(prefs.curFile) ) {
 			error("CDB file has unresolved conflict, merge by hand before reloading.");
 			return;
@@ -2759,7 +2766,11 @@ class Main extends Model {
 	public static var inst : Main;
 	static function main() {
 		untyped if( js.node.Fs.accessSync == null ) js.node.Fs.accessSync = function(path) if( !(js.node.Fs : Dynamic).existsSync(path) ) throw path + " does not exists";
-		inst = new Main();
+		try {
+			inst = new Main();
+		} catch( e : Dynamic ) {
+			js.Syntax.code("console.error('Main init error:', {0})", e);
+		}
 		Reflect.setField(js.Browser.window, "_", inst);
 	}
 
