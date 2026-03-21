@@ -54,10 +54,7 @@ class BrowserFile {
 		a.style.display = "none";
 		js.Browser.document.body.appendChild(cast a);
 		a.click();
-		js.Browser.setTimeout(function() {
-			URL.revokeObjectURL(url);
-			a.remove();
-		}, 100);
+		js.Syntax.code("setTimeout(function() { URL.revokeObjectURL({0}); a.remove(); }, 100)", url);
 	}
 
 	public static function saveBytes(bytes: js.html.ArrayBuffer, filename: String): Void {
@@ -69,10 +66,7 @@ class BrowserFile {
 		a.style.display = "none";
 		js.Browser.document.body.appendChild(cast a);
 		a.click();
-		js.Browser.setTimeout(function() {
-			URL.revokeObjectURL(url);
-			a.remove();
-		}, 100);
+		js.Syntax.code("setTimeout(function() { URL.revokeObjectURL({0}); a.remove(); }, 100)", url);
 	}
 
 	public static function openFile(callback: String -> Void): Void {

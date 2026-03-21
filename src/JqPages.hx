@@ -190,8 +190,14 @@ class JqPage extends vdom.Server {
 				var suggestedName = fpath.file != null && fpath.file.length > 0 ? fpath.file : "data.cdb";
 				if( Std.is(data, String) )
 					BrowserFile.saveFile(data, suggestedName);
-				else if( Std.is(data, haxe.io.Bytes) )
-					BrowserFile.saveBytes(data, suggestedName);
+				else if( Std.is(data, haxe.io.Bytes) ) {
+					var bytes : haxe.io.Bytes = data;
+					var ab = new js.html.ArrayBuffer(bytes.length);
+					var view = new js.lib.Uint8Array(ab);
+					for( i in 0...bytes.length )
+						view[i] = bytes.get(i);
+					BrowserFile.saveBytes(ab, suggestedName);
+				}
 				result(null);
 			}
 			#else
