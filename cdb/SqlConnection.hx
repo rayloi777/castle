@@ -63,21 +63,21 @@ class SqlConnection implements sys.db.Connection {
 	}
 
 	public function escape( s : String ) : String {
-		throw "TODO " + s;
+		throw "SqlConnection.escape not implemented (value: " + s + ")";
 		return s;
 	}
 
 	public function quote( s : String ) : String {
-		throw "TODO";
+		throw "SqlConnection.quote not implemented";
 		return s;
 	}
 
 	public function addValue( s : StringBuf, v : Dynamic ) {
-		throw "TODO";
+		throw "SqlConnection.addValue not implemented";
 	}
 
 	public function lastInsertId() {
-		throw "TODO";
+		throw "SqlConnection.lastInsertId not implemented";
 		return 0;
 	}
 

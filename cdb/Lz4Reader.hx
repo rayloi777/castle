@@ -62,14 +62,14 @@ class Lz4Reader {
 		var blockChecksum = flags & 16 != 0;
 		var streamSize = flags & 8 != 0;
 		var streamChecksum = flags & 4 != 0;
-		if( flags & 2 != 0 ) throw "assert";
+		if( flags & 2 != 0 ) throw "LZ4: reserved flag bit 1 must be 0, got " + flags;
 		var presetDict = flags & 1 != 0;
 
 		var bd = b();
-		if( bd & 128 != 0 ) throw "assert";
+		if( bd & 128 != 0 ) throw "LZ4: reserved block descriptor flag bit must be 0, got " + bd;
 		var maxBlockSize = [0, 0, 0, 0, 1 << 16, 1 << 18, 1 << 20, 1 << 22][(bd >> 4) & 7];
-		if( maxBlockSize == 0 ) throw "assert";
-		if( bd & 15 != 0 ) throw "assert";
+		if( maxBlockSize == 0 ) throw "LZ4: invalid max block size from bd=" + bd;
+		if( bd & 15 != 0 ) throw "LZ4: reserved block descriptor bits must be 0, got " + (bd & 15);
 
 		if( streamSize )
 			pos += 8;

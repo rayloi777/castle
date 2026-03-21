@@ -751,7 +751,7 @@ class Module {
 								case TBool: macro : Bool;
 								case TCustom(name): name.toComplex();
 								case TRef(name): (makeTypeName(name) + (a.kind == TypeKind ? "Kind" : "")).toComplex();
-								default: throw "TODO " + a.type;
+								default: throw "Module: unsupported column type " + a.type + " in custom type argument";
 								}
 								{
 									name : a.name,
@@ -785,7 +785,7 @@ class Module {
 						var fname = fieldName(s);
 						macro $i{modName}.$fname.resolve(v[$v{ai+1}]);
 					case TList, TLayer(_), TTilePos, TProperties, TPolymorph:
-						throw "assert";
+						throw "Module: complex types not supported in kind index (TList, TLayer, TTilePos, TProperties, TPolymorph)";
 					}
 					eargs.push(econv);
 				}

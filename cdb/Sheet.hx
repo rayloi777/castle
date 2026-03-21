@@ -84,7 +84,7 @@ class Sheet {
 		}
 
 		if( p.s.isLevel() && p.c == "tileProps" ) {
-			if( scope == 0 ) throw "TODO";
+			if( scope == 0 ) throw "Sheet.getLines: scope 0 (tileprops) not yet supported";
 			// level tileprops
 			var all = [];
 			var sets = p.s.props.level.tileSets;
@@ -582,7 +582,7 @@ class Sheet {
 
 	public function sync() {
 		if( parent != null )
-			throw "assert";
+			throw "Sheet.sync should not be called on sub-sheets";
 		index = new Map();
 		duplicateIds = new Map();
 		all = [];

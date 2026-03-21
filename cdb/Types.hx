@@ -473,7 +473,7 @@ abstract Guid<T>(String) {
 		for( i in 0...13 ) {
 			if( i == 4 || i == 9 ) continue;
 			var v = CVALUES[this.charCodeAt(i)];
-			if( v < 0 ) throw "assert";
+			if( v < 0 ) throw "Assertion failed: invalid GUID character at index " + i;
 			tot |= (v : haxe.Int64) << (60 - (k++ * 6));
 		}
 		return tot;

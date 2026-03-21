@@ -160,7 +160,7 @@ class DiffFile {
 			}
 			for( vnew in lines1 ) {
 				var vid : String = Reflect.field(vnew,cid.name);
-				if( vid == null ) throw "assert";
+				if( vid == null ) throw "Diff: line missing id field '" + cid.name + "'";
 				var vold = oldById.get(vid);
 				var d;
 				if( vold != null ) {
@@ -176,7 +176,7 @@ class DiffFile {
 			return diff;
 		} else {
 			if( lines1.length != lines2.length )
-				throw "TODO : lines length diff "+s1.name;
+				throw "Diff: line reordering not yet supported (" + s1.name + ": " + lines1.length + " lines vs " + lines2.length + " lines)";
 			for( i in 0...lines1.length ) {
 				var obj1 : Dynamic = lines1[i];
 				var obj2 : Dynamic = lines2[i];

@@ -16,7 +16,7 @@ class LangXml {
 	public var _elements : Array<LangXml>;
 	public var _html : String;
 	public function new() { }
-	public inline function unescape() { if( _html == null ) throw "assert"; return _html; }
+	public inline function unescape() { if( _html == null ) throw "LangNode: unescape called before parse"; return _html; }
 	public inline function elements() return _elements;
 }
 
@@ -210,7 +210,7 @@ class Lang {
 			var outLines = [];
 			applySheet(path, s, makeSheetFields(s), s.lines, x, outLines);
 			if( out.exists(s.name) )
-				throw "assert";
+				throw "Lang: duplicate sheet name '" + s.name + "' in output";
 			out.set(s.name, outLines);
 		}
 		return out;

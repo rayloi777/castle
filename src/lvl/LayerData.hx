@@ -199,7 +199,7 @@ class LayerData extends LayerGfx {
 			case Objects:
 				var insts = [];
 				var p = 1;
-				if( data[0] != 0xFFFF ) throw "assert";
+				if( data[0] != 0xFFFF ) throw "LayerData.Objects: invalid magic header 0x" + StringTools.hex(data[0]) + " (expected 0xFFFF)";
 				while( p < data.length ) {
 					var x = data[p++];
 					var y = data[p++];
@@ -440,7 +440,7 @@ class LayerData extends LayerGfx {
 				this.data = TileInstances(td, [for( o in objs ) { x : o.x, y : o.y, o : o.id, flip : false, rot : 0 }]);
 				dirty = true;
 			default:
-				throw "assert0";
+				throw "LayerData: invalid layer combination for scale operation - expected Objects layer";
 			}
 		case [Objects, (Ground | Tiles)]:
 			switch( data ) {
@@ -464,7 +464,7 @@ class LayerData extends LayerGfx {
 				this.data = Tiles(td, data);
 				dirty = true;
 			default:
-				throw "assert1";
+				throw "LayerData: invalid layer combination for flatten operation - expected TileInstances";
 			}
 		}
 		props.mode = mode;

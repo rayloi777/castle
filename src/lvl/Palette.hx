@@ -632,7 +632,7 @@ class Palette {
 				case TFloat: Std.parseFloat(val);
 				case TString: val;
 				case TDynamic: try level.model.base.parseDynamic(val) catch( e : Dynamic ) null;
-				default: throw "assert";
+				default: throw "Palette: unsupported tile property type for parsing: " + p.type;
 				}
 				if( v == null )
 					Reflect.deleteField(t, p.name);

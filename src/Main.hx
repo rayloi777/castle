@@ -1448,7 +1448,7 @@ class Main extends Model {
 				});
 			});
 		case TList, TLayer(_), TTilePos, TProperties:
-			throw "assert2";
+			throw "Main: unexpected complex type in saveTileProps - TList, TLayer, TTilePos, or TProperties";
 		case TCurve, TGradient, TGuid, TPolymorph:
 			return;
 		}
