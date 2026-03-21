@@ -2059,9 +2059,9 @@ class Main extends Model {
 		content.empty();
 		content.append(cols);
 
-		var snext = 0;
-		for( i in 0...lines.length ) {
-			while( sheet.separators[snext].index == i ) {
+	var snext = 0;
+	for( i in 0...lines.length ) {
+		while( snext < sheet.separators.length && sheet.separators[snext].index == i ) {
 				var sep = J("<tr>").addClass("separator").append('<td colspan="${colCount+1}">').appendTo(content);
 				var content = sep.find("td");
 				var title = if( sheet.props.separatorTitles != null ) sheet.props.separatorTitles[snext] else null;
