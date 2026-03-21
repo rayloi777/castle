@@ -80,6 +80,8 @@ class Main extends Model {
 		window.on("resize", onResize);
 		window.on("focus", function(_) js.node.webkit.App.clearCache());
 		initMenu();
+		initToolbar();
+		initWelcome();
 		levels = [];
 		mousePos = { x : 0, y : 0 };
 		sheetCursors = new Map();
@@ -111,6 +113,136 @@ class Main extends Model {
 		load(true);
 		var t = new haxe.Timer(1000);
 		t.run = checkTime;
+	}
+
+	function initToolbar() {
+		J("#btn-home").click(function(_) { showWelcome(); });
+		J("#btn-new").click(function(_) { actionNew(); });
+		J("#btn-open").click(function(_) { actionOpen(); });
+		J("#btn-save").click(function(_) { actionSave(); });
+		J("#btn-saveas").click(function(_) { actionSaveAs(); });
+		J("#btn-undo").click(function(_) { 
+			if( history.length > 0 ) {
+				redo.push(curSavedData);
+				curSavedData = history.pop();
+				quickLoad(curSavedData);
+				initContent();
+				save(false);
+			}
+		});
+		J("#btn-redo").click(function(_) { 
+			if( redo.length > 0 ) {
+				history.push(curSavedData);
+				curSavedData = redo.pop();
+				quickLoad(curSavedData);
+				initContent();
+				save(false);
+			}
+		});
+		J("#btn-addrow").click(function(_) {
+			if( viewSheet != null ) newLine(viewSheet, -1);
+		});
+		J("#btn-insrow").click(function(_) {
+			if( viewSheet != null && cursor.y >= 0 ) newLine(viewSheet, cursor.y);
+		});
+		J("#btn-delrow").click(function(_) {
+			if( viewSheet != null && cursor.y >= 0 ) {
+				viewSheet.deleteLine(cursor.y);
+				refresh();
+				save();
+			}
+		});
+		J("#btn-types").click(function(_) { editTypes(); });
+		J("#toolbar-search").on("input", function(_) {
+			searchFilter(JTHIS.val());
+		});
+	}
+
+	function initWelcome() {
+		var recent = prefs.recent;
+		var hasRecent = recent != null && recent.length > 0;
+		var hasCurrentFile = prefs.curFile != null;
+		
+		if( !hasRecent ) {
+			J("#welcome-recent").hide();
+		} else {
+			J("#welcome-recent").show();
+			var list = J("#recent-list");
+			list.empty();
+			for( file in recent.slice(0, 5) ) {
+				var li = J("<li>").text(file).click(function(_) {
+					prefs.curFile = file;
+					load();
+					J("#welcome").hide();
+				});
+				list.append(li);
+			}
+		}
+		J("#welcome-new").click(function(_) { actionNew(); });
+		J("#welcome-open").click(function(_) { actionOpen(); });
+		J("#fileOpen").change(function(e) {
+			var file = JTHIS.val();
+			if( file != "" ) {
+				prefs.curFile = file;
+				load();
+				J("#welcome").hide();
+				JTHIS.val("");
+			}
+		});
+		J("#fileSaveAs").change(function(e) {
+			var file = JTHIS.val();
+			if( file != "" ) {
+				prefs.curFile = file;
+				save();
+				JTHIS.val("");
+			}
+		});
+		
+		if( !hasCurrentFile ) {
+			J("#welcome").show();
+		}
+	}
+
+	function showWelcome() {
+		var recent = prefs.recent;
+		var hasRecent = recent != null && recent.length > 0;
+		if( !hasRecent ) {
+			J("#welcome-recent").hide();
+		} else {
+			J("#welcome-recent").show();
+			var list = J("#recent-list");
+			list.empty();
+			for( file in recent.slice(0, 5) ) {
+				var li = J("<li>").text(file).click(function(_) {
+					prefs.curFile = file;
+					load();
+					J("#welcome").hide();
+				});
+				list.append(li);
+			}
+		}
+		J("#welcome").show();
+	}
+
+	function actionNew() {
+		prefs.curFile = null;
+		load(true);
+		J("#welcome").hide();
+	}
+
+	function actionOpen() {
+		J("#fileOpen").click();
+	}
+
+	function actionSave() {
+		if( prefs.curFile == null )
+			actionSaveAs();
+		else
+			save();
+	}
+
+	function actionSaveAs() {
+		J("#fileSaveAs").click();
 	}
 
 	function searchFilter( filter : String ) {
@@ -2610,6 +2742,7 @@ class Main extends Model {
 		lastSave = getFileTime();
 		super.load(noError);
 
+		J("#welcome").hide();
 		initContent();
 		prefs.recent.remove(prefs.curFile);
 		if( prefs.curFile != null )

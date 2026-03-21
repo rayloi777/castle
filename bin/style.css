@@ -854,3 +854,141 @@ div#menu ul.sheets li.active {
 #search i:hover {
 	color : #888;
 }
+
+/* Toolbar */
+#toolbar {
+	position : fixed;
+	top : 0;
+	left : 0;
+	right : 0;
+	height : 40px;
+	background : #e8e8e8;
+	border-bottom : 1px solid #ccc;
+	display : flex;
+	align-items : center;
+	padding : 0 10px;
+	z-index : 1000;
+	-webkit-app-region : drag;
+}
+.toolbar-group {
+	display : flex;
+	gap : 4px;
+	align-items : center;
+	-webkit-app-region : no-drag;
+}
+.toolbar-btn {
+	padding : 4px 12px;
+	background : #f0f0f0;
+	border : 1px solid #bbb;
+	border-radius : 3px;
+	cursor : pointer;
+	font-size : 12px;
+	min-width : 28px;
+	text-align : center;
+}
+.toolbar-btn:hover {
+	background : #d8d8d8;
+}
+.toolbar-btn:active {
+	background : #c8c8c8;
+}
+.toolbar-sep {
+	width : 1px;
+	height : 24px;
+	background : #ccc;
+	margin : 0 8px;
+}
+#search-ops input {
+	padding : 4px 8px;
+	border : 1px solid #bbb;
+	border-radius : 3px;
+	width : 180px;
+	font-size : 12px;
+}
+#search-ops input:focus {
+	outline : none;
+	border-color : #88f;
+}
+
+/* Content area needs to account for toolbar */
+div#content {
+	margin-top : 40px;
+}
+
+/* Welcome Screen */
+#welcome {
+	background-color : rgba(0,0,0,0.6);
+	display : flex;
+	align-items : center;
+	justify-content : center;
+	z-index : 2000;
+}
+.welcome-content {
+	background : white;
+	padding : 40px 50px;
+	border-radius : 10px;
+	text-align : center;
+	min-width : 400px;
+	box-shadow : 0 4px 20px rgba(0,0,0,0.3);
+}
+.welcome-content h1 {
+	color : #333;
+	font-size : 32px;
+	margin : 0 0 8px 0;
+}
+.welcome-subtitle {
+	color : #888;
+	font-size : 14px;
+	margin-bottom : 24px;
+}
+.welcome-actions {
+	display : flex;
+	gap : 16px;
+	justify-content : center;
+	margin-bottom : 24px;
+}
+.welcome-btn {
+	padding : 12px 24px;
+	font-size : 14px;
+	border : 1px solid #bbb;
+	border-radius : 5px;
+	cursor : pointer;
+	background : #f0f0f0;
+}
+.welcome-btn:hover {
+	background : #e0e0e0;
+}
+.welcome-btn.primary {
+	background : #4488ff;
+	color : white;
+	border-color : #3377ee;
+}
+.welcome-btn.primary:hover {
+	background : #3377ee;
+}
+#welcome-recent {
+	margin-top : 16px;
+	padding-top : 16px;
+	border-top : 1px solid #eee;
+}
+#welcome-recent h3 {
+	font-size : 14px;
+	color : #666;
+	text-align : left;
+	margin : 0 0 8px 0;
+}
+#recent-list {
+	list-style : none;
+	padding : 0;
+	margin : 0;
+	text-align : left;
+}
+#recent-list li {
+	padding : 8px 12px;
+	cursor : pointer;
+	border-radius : 4px;
+	color : #333;
+}
+#recent-list li:hover {
+	background : #f0f0f0;
+}

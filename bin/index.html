@@ -15,9 +15,55 @@
 
 <body>
 
+<div id="toolbar">
+	<div class="toolbar-group" id="file-ops">
+		<button id="btn-home" class="toolbar-btn" title="Home">Home</button>
+		<button id="btn-new" class="toolbar-btn" title="New (Ctrl+N)">New</button>
+		<button id="btn-open" class="toolbar-btn" title="Open (Ctrl+O)">Open</button>
+		<button id="btn-save" class="toolbar-btn" title="Save (Ctrl+S)">Save</button>
+		<button id="btn-saveas" class="toolbar-btn" title="Save As">Save As</button>
+	</div>
+	<div class="toolbar-sep"></div>
+	<div class="toolbar-group" id="edit-ops">
+		<button id="btn-undo" class="toolbar-btn" title="Undo (Ctrl+Z)">Undo</button>
+		<button id="btn-redo" class="toolbar-btn" title="Redo (Ctrl+Y)">Redo</button>
+	</div>
+	<div class="toolbar-sep"></div>
+	<div class="toolbar-group" id="row-ops">
+		<button id="btn-addrow" class="toolbar-btn" title="Add Row">+ Row</button>
+		<button id="btn-insrow" class="toolbar-btn" title="Insert Row">Ins Row</button>
+		<button id="btn-delrow" class="toolbar-btn" title="Delete Row">Del Row</button>
+	</div>
+	<div class="toolbar-sep"></div>
+	<div class="toolbar-group" id="type-ops">
+		<button id="btn-types" class="toolbar-btn" title="Edit Types">Types</button>
+	</div>
+	<div class="toolbar-sep"></div>
+	<div class="toolbar-group" id="search-ops">
+		<input type="text" id="toolbar-search" placeholder="Filter rows..."/>
+	</div>
+</div>
+
 <div id="helpers">
 
 	<input type="file" id="fileSelect" style="display:none"/>
+	<input type="file" id="fileOpen" style="display:none" accept=".cdb"/>
+	<input type="file" id="fileSaveAs" style="display:none" nwsaveas=".cdb" accept=".cdb"/>
+
+	<div id="welcome" class="modal" style="display:none">
+		<div class="welcome-content">
+			<h1>CastleDB</h1>
+			<div class="welcome-subtitle">Structured Database Editor</div>
+			<div class="welcome-actions">
+				<button id="welcome-new" class="welcome-btn primary">New Database</button>
+				<button id="welcome-open" class="welcome-btn">Open File...</button>
+			</div>
+			<div id="welcome-recent">
+				<h3>Recent Files</h3>
+				<ul id="recent-list"></ul>
+			</div>
+		</div>
+	</div>
 
 	<div id="newsheet" class="modal" style="display:none">
 		<div class="content">
