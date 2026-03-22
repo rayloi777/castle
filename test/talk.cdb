@@ -1,0 +1,317 @@
+{
+	"sheets": [
+		{
+			"name": "Characters",
+			"columns": [
+				{
+					"name": "id",
+					"typeStr": "0",
+					"opt": false
+				},
+				{
+					"name": "name",
+					"typeStr": "1",
+					"opt": false
+				},
+				{
+					"name": "portrait",
+					"typeStr": "7",
+					"opt": true
+				},
+				{
+					"name": "color",
+					"typeStr": "11",
+					"opt": true
+				}
+			],
+			"lines": [
+				{
+					"id": "player",
+					"name": "Player",
+					"color": 13636885
+				},
+				{
+					"id": "npc1",
+					"name": "Village Elder",
+					"color": 8469050
+				}
+			],
+			"props": {
+				"displayColumn": "name"
+			},
+			"separators": []
+		},
+		{
+			"name": "Dialogues",
+			"columns": [
+				{
+					"name": "id",
+					"typeStr": "0",
+					"opt": false
+				},
+				{
+					"name": "speaker",
+					"typeStr": "6:Characters",
+					"opt": true
+				},
+				{
+					"name": "text",
+					"typeStr": "1",
+					"opt": false
+				},
+				{
+					"name": "emotion",
+					"typeStr": "5:normal,happy,sad,angry,surprised,confused",
+					"opt": true
+				},
+				{
+					"name": "portrait",
+					"typeStr": "7",
+					"opt": true
+				},
+				{
+					"name": "nextId",
+					"typeStr": "6:Dialogues",
+					"opt": true
+				},
+				{
+					"name": "condition",
+					"typeStr": "6:Conditions",
+					"opt": true
+				},
+				{
+					"name": "isEnd",
+					"typeStr": "2",
+					"opt": false
+				}
+			],
+			"lines": [
+				{
+					"id": "d001",
+					"speaker": "npc1",
+					"text": "Welcome, traveler! What brings you to our village?",
+					"emotion": 1,
+					"nextId": "d002",
+					"isEnd": false
+				},
+				{
+					"id": "d002",
+					"speaker": "player",
+					"text": "",
+					"emotion": 2,
+					"isEnd": false,
+					"choices": [
+						{
+							"text": "I need information.",
+							"nextId": "d003"
+						},
+						{
+							"text": "I'm looking for work.",
+							"nextId": "d004"
+						},
+						{
+							"text": "Just passing through. Farewell.",
+							"nextId": "d005"
+						}
+					]
+				},
+				{
+					"id": "d003",
+					"speaker": "npc1",
+					"text": "What kind of information do you seek?",
+					"emotion": 4,
+					"nextId": "d002",
+					"isEnd": false
+				},
+				{
+					"id": "d004",
+					"speaker": "npc1",
+					"text": "Indeed! We have a quest for you...",
+					"emotion": "happy",
+					"nextId": "d006",
+					"isEnd": false
+				},
+				{
+					"id": "d005",
+					"speaker": "npc1",
+					"text": "Safe travels, stranger!",
+					"emotion": "normal",
+					"isEnd": true
+				},
+				{
+					"id": "d006",
+					"speaker": "npc1",
+					"text": "The goblins have been spotted near the old mine. Bring me 3 goblin ears as proof.",
+					"emotion": "normal",
+					"nextId": "d007",
+					"isEnd": false
+				},
+				{
+					"id": "d007",
+					"speaker": "player",
+					"text": "",
+					"emotion": "normal",
+					"isEnd": false,
+					"choices": [
+						{
+							"text": "I'll do it!",
+							"nextId": "d008"
+						},
+						{
+							"text": "What's the reward?",
+							"nextId": "d009"
+						}
+					]
+				},
+				{
+					"id": "d008",
+					"speaker": "npc1",
+					"text": "Excellent! Return when you have the ears.",
+					"emotion": "happy",
+					"isEnd": true
+				},
+				{
+					"id": "d009",
+					"speaker": "npc1",
+					"text": "I can offer you 100 gold coins.",
+					"emotion": "normal",
+					"condition": "cond_gold_100",
+					"nextId": "d008",
+					"isEnd": false
+				}
+			],
+			"props": {
+				"displayColumn": "text"
+			},
+			"separators": []
+		},
+		{
+			"name": "Choices",
+			"columns": [
+				{
+					"name": "id",
+					"typeStr": "0",
+					"opt": false
+				},
+				{
+					"name": "dialogueId",
+					"typeStr": "6:Dialogues",
+					"opt": false
+				},
+				{
+					"name": "text",
+					"typeStr": "1",
+					"opt": false
+				},
+				{
+					"name": "nextId",
+					"typeStr": "6:Dialogues",
+					"opt": true
+				},
+				{
+					"name": "condition",
+					"typeStr": "6:Conditions",
+					"opt": true
+				},
+				{
+					"name": "order",
+					"typeStr": "3",
+					"opt": false
+				}
+			],
+			"lines": [
+				{
+					"id": "c001",
+					"dialogueId": "d002",
+					"text": "I need information.",
+					"nextId": "d003",
+					"order": 0
+				},
+				{
+					"id": "c002",
+					"dialogueId": "d002",
+					"text": "I'm looking for work.",
+					"nextId": "d004",
+					"order": 1
+				},
+				{
+					"id": "c003",
+					"dialogueId": "d002",
+					"text": "Just passing through. Farewell.",
+					"nextId": "d005",
+					"order": 2
+				},
+				{
+					"id": "c004",
+					"dialogueId": "d007",
+					"text": "I'll do it!",
+					"nextId": "d008",
+					"order": 0
+				},
+				{
+					"id": "c005",
+					"dialogueId": "d007",
+					"text": "What's the reward?",
+					"nextId": "d009",
+					"order": 1
+				}
+			],
+			"props": {
+				"displayColumn": "text"
+			},
+			"separators": []
+		},
+		{
+			"name": "Conditions",
+			"columns": [
+				{
+					"name": "id",
+					"typeStr": "0",
+					"opt": false
+				},
+				{
+					"name": "name",
+					"typeStr": "1",
+					"opt": false
+				},
+				{
+					"name": "variable",
+					"typeStr": "1",
+					"opt": false
+				},
+				{
+					"name": "operator",
+					"typeStr": "5:==,!=,>,<,>=,<=",
+					"opt": false
+				},
+				{
+					"name": "value",
+					"typeStr": "1",
+					"opt": false
+				}
+			],
+			"lines": [
+				{
+					"id": "cond_gold_100",
+					"name": "Gold >= 100",
+					"variable": "gold",
+					"operator": 2,
+					"value": "100"
+				},
+				{
+					"id": "cond_has_key",
+					"name": "Has Key",
+					"variable": "hasKey",
+					"operator": 0,
+					"value": "true"
+				}
+			],
+			"props": {
+				"displayColumn": "name"
+			},
+			"separators": []
+		}
+	],
+	"customTypes": [],
+	"compress": false
+}
