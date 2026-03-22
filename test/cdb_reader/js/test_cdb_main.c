@@ -475,16 +475,13 @@ int main(int argc, char **argv) {
 
     const char *script_fmt = 
         "var db = CDB.open('%s');\n"
-        "console.log('db type: ' + typeof db);\n"
-        "console.log('getSheetCount type: ' + typeof db.getSheetCount);\n"
-        "var count = db.getSheetCount();\n"
-        "console.log('Sheet count: ' + count);\n"
-        "var names = db.getSheetNames();\n"
-        "console.log('Sheet names: ' + JSON.stringify(names));\n"
         "var weapons = db.sheet('武器');\n"
-        "console.log('weapons type: ' + typeof weapons);\n"
-        "var rowCount = weapons.getRowCount();\n"
-        "console.log('Row count: ' + rowCount);\n"
+        "var rows = weapons.getRows();\n"
+        "console.log('Rows length: ' + rows.length);\n"
+        "for (var i = 0; i < rows.length; i++) {\n"
+        "    var item = rows[i].toObject();\n"
+        "    console.log(item.名稱 + ' - ATK:' + item.物理傷害);\n"
+        "}\n"
         "db.close();\n"
         "console.log('Done!');\n";
 
