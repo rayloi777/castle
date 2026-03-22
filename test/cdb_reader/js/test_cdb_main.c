@@ -211,6 +211,64 @@ static JSValue js_sheet_get_rows(JSContext *ctx, JSValueConst thisVal, int argc,
     return arr;
 }
 
+static JSValue js_sheet_get_column_count(JSContext *ctx, JSValueConst thisVal, int argc, JSValueConst *argv) {
+    JSheet *jsheet = JS_GetOpaque(thisVal, js_sheet_class_id);
+    if (!jsheet) {
+        return JS_EXCEPTION;
+    }
+    return JS_NewInt32(ctx, cdb_column_count(jsheet->sheet));
+}
+
+static JSValue js_sheet_get_column_name(JSContext *ctx, JSValueConst thisVal, int argc, JSValueConst *argv) {
+    JSheet *jsheet = JS_GetOpaque(thisVal, js_sheet_class_id);
+    if (!jsheet || argc < 1) {
+        return JS_EXCEPTION;
+    }
+    int32_t idx;
+    JS_ToInt32(ctx, &idx, argv[0]);
+    CDBColumn *col = cdb_get_column(jsheet->sheet, idx);
+    if (!col) {
+        return JS_EXCEPTION;
+    }
+    const char *name = cdb_column_get_name(col);
+    return JS_NewString(ctx, name ? name : "");
+}
+
+static JSValue js_sheet_get_column_type(JSContext *ctx, JSValueConst thisVal, int argc, JSValueConst *argv) {
+    JSheet *jsheet = JS_GetOpaque(thisVal, js_sheet_class_id);
+    if (!jsheet || argc < 1) {
+        return JS_EXCEPTION;
+    }
+    int32_t idx;
+    JS_ToInt32(ctx, &idx, argv[0]);
+    CDBColumn *col = cdb_get_column(jsheet->sheet, idx);
+    if (!col) {
+        return JS_EXCEPTION;
+    }
+    return JS_NewInt32(ctx, cdb_column_get_type(col));
+}
+
+static JSValue js_sheet_get_column_enum_values(JSContext *ctx, JSValueConst thisVal, int argc, JSValueConst *argv) {
+    JSheet *jsheet = JS_GetOpaque(thisVal, js_sheet_class_id);
+    if (!jsheet || argc < 1) {
+        return JS_EXCEPTION;
+    }
+    int32_t idx;
+    JS_ToInt32(ctx, &idx, argv[0]);
+    CDBColumn *col = cdb_get_column(jsheet->sheet, idx);
+    if (!col) {
+        return JS_EXCEPTION;
+    }
+    
+    JSValue arr = JS_NewArray(ctx);
+    int enum_count = cdb_column_get_enum_count(col);
+    for (int i = 0; i < enum_count; i++) {
+        const char *val = cdb_column_get_enum_value(col, i);
+        JS_SetPropertyUint32(ctx, arr, i, JS_NewString(ctx, val ? val : ""));
+    }
+    return arr;
+}
+
 static JSValue js_row_get(JSContext *ctx, JSValueConst thisVal, int argc, JSValueConst *argv) {
     JRow *jrow = JS_GetOpaque(thisVal, js_row_class_id);
     const char *col_name;
@@ -365,6 +423,10 @@ static const JSCFunctionListEntry js_sheet_funcs[] = {
     JS_CFUNC_DEF("getName", 0, js_sheet_get_name),
     JS_CFUNC_DEF("getRowCount", 0, js_sheet_get_row_count),
     JS_CFUNC_DEF("getRows", 0, js_sheet_get_rows),
+    JS_CFUNC_DEF("getColumnCount", 0, js_sheet_get_column_count),
+    JS_CFUNC_DEF("getColumnName", 1, js_sheet_get_column_name),
+    JS_CFUNC_DEF("getColumnType", 1, js_sheet_get_column_type),
+    JS_CFUNC_DEF("getColumnEnumValues", 1, js_sheet_get_column_enum_values),
 };
 
 static const JSCFunctionListEntry js_row_funcs[] = {
@@ -468,27 +530,36 @@ int main(int argc, char **argv) {
 
     JSValue global_obj = JS_GetGlobalObject(ctx);
     JS_SetPropertyStr(ctx, global_obj, "CDB", cdb_obj);
+    JS_SetPropertyStr(ctx, global_obj, "CDB_PATH", JS_NewString(ctx, cdb_path));
     JS_FreeValue(ctx, global_obj);
 
-    printf("=== CastleDB QuickJS Test ===\n\n");
-    printf("Opening: %s\n", cdb_path);
+    FILE *f = fopen("test_cdb.js", "r");
+    if (!f) {
+        fprintf(stderr, "Failed to open test_cdb.js\n");
+        JS_FreeContext(ctx);
+        JS_FreeRuntime(rt);
+        return 1;
+    }
 
-    const char *script_fmt = 
-        "var db = CDB.open('%s');\n"
-        "var weapons = db.sheet('武器');\n"
-        "var rows = weapons.getRows();\n"
-        "console.log('Rows length: ' + rows.length);\n"
-        "for (var i = 0; i < rows.length; i++) {\n"
-        "    var item = rows[i].toObject();\n"
-        "    console.log(item.名稱 + ' - ATK:' + item.物理傷害);\n"
-        "}\n"
-        "db.close();\n"
-        "console.log('Done!');\n";
+    fseek(f, 0, SEEK_END);
+    long script_len = ftell(f);
+    fseek(f, 0, SEEK_SET);
 
-    char full_script[4096];
-    snprintf(full_script, sizeof(full_script), script_fmt, cdb_path);
+    char *script_buf = malloc(script_len + 1);
+    if (!script_buf) {
+        fclose(f);
+        fprintf(stderr, "Failed to allocate memory\n");
+        JS_FreeContext(ctx);
+        JS_FreeRuntime(rt);
+        return 1;
+    }
 
-    result = JS_Eval(ctx, full_script, strlen(full_script), "<test>", 0);
+    fread(script_buf, 1, script_len, f);
+    script_buf[script_len] = '\0';
+    fclose(f);
+
+    result = JS_Eval(ctx, script_buf, script_len, "test_cdb.js", 0);
+    free(script_buf);
     
     if (JS_IsException(result)) {
         fprintf(stderr, "Script error: ");
