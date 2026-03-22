@@ -373,15 +373,16 @@ static const JSCFunctionListEntry js_row_funcs[] = {
 };
 
 static int js_cdb_init(JSContext *ctx, JSModuleDef *m) {
+    JSRuntime *rt = JS_GetRuntime(ctx);
     JSValue proto_cdb, proto_sheet, proto_row;
 
-    JS_NewClassID(&js_cdb_class_id);
-    JS_NewClassID(&js_sheet_class_id);
-    JS_NewClassID(&js_row_class_id);
+    JS_NewClassID(rt, &js_cdb_class_id);
+    JS_NewClassID(rt, &js_sheet_class_id);
+    JS_NewClassID(rt, &js_row_class_id);
 
-    JS_NewClass(JS_GetRuntime(ctx), js_cdb_class_id, &js_cdb_class);
-    JS_NewClass(JS_GetRuntime(ctx), js_sheet_class_id, &js_sheet_class);
-    JS_NewClass(JS_GetRuntime(ctx), js_row_class_id, &js_row_class);
+    JS_NewClass(rt, js_cdb_class_id, &js_cdb_class);
+    JS_NewClass(rt, js_sheet_class_id, &js_sheet_class);
+    JS_NewClass(rt, js_row_class_id, &js_row_class);
 
     proto_cdb = JS_NewObject(ctx);
     JS_SetPropertyFunctionList(ctx, proto_cdb, js_cdb_funcs, sizeof(js_cdb_funcs)/sizeof(js_cdb_funcs[0]));
@@ -434,39 +435,39 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    js_std_add_helpers(ctx, argc, argv);
     js_init_module_std(ctx, "std");
     js_init_module_os(ctx, "os");
 
-    JS_NewClassID(&js_cdb_class_id);
-    JS_NewClassID(&js_sheet_class_id);
-    JS_NewClassID(&js_row_class_id);
+    JS_NewClassID(rt, &js_cdb_class_id);
+    JS_NewClassID(rt, &js_sheet_class_id);
+    JS_NewClassID(rt, &js_row_class_id);
 
-    JS_NewClass(JS_GetRuntime(ctx), js_cdb_class_id, &js_cdb_class);
-    JS_NewClass(JS_GetRuntime(ctx), js_sheet_class_id, &js_sheet_class);
-    JS_NewClass(JS_GetRuntime(ctx), js_row_class_id, &js_row_class);
+    JS_NewClass(rt, js_cdb_class_id, &js_cdb_class);
+    JS_NewClass(rt, js_sheet_class_id, &js_sheet_class);
+    JS_NewClass(rt, js_row_class_id, &js_row_class);
+
+    JSValue proto_cdb = JS_NewObject(ctx);
+    JS_SetPropertyFunctionList(ctx, proto_cdb, js_cdb_funcs, sizeof(js_cdb_funcs)/sizeof(js_cdb_funcs[0]));
+    JS_SetClassProto(ctx, js_cdb_class_id, proto_cdb);
+
+    JSValue proto_sheet = JS_NewObject(ctx);
+    JS_SetPropertyFunctionList(ctx, proto_sheet, js_sheet_funcs, sizeof(js_sheet_funcs)/sizeof(js_sheet_funcs[0]));
+    JS_SetClassProto(ctx, js_sheet_class_id, proto_sheet);
+
+    JSValue proto_row = JS_NewObject(ctx);
+    JS_SetPropertyFunctionList(ctx, proto_row, js_row_funcs, sizeof(js_row_funcs)/sizeof(js_row_funcs[0]));
+    JS_SetClassProto(ctx, js_row_class_id, proto_row);
 
     cdb_obj = JS_NewObject(ctx);
-    JSValue open_func = JS_NewCFunction2(ctx, (JSCFunction *)js_cdb_open, "open", 1, JS_CFUNC_generic, 0);
-    fprintf(stderr, "DEBUG: open_func tag = %d, isException = %d\n", JS_VALUE_GET_TAG(open_func), JS_IsException(open_func));
-    if (JS_IsException(open_func)) {
-        JSValue err = JS_GetException(ctx);
-        JSValue err_str = JS_ToString(ctx, err);
-        const char *err_msg = JS_ToCString(ctx, err_str);
-        fprintf(stderr, "DEBUG: Exception creating function: %s\n", err_msg ? err_msg : "unknown");
-        JS_FreeCString(ctx, err_msg);
-        JS_FreeValue(ctx, err_str);
-        JS_FreeValue(ctx, err);
-    }
-    int ret = JS_SetPropertyStr(ctx, cdb_obj, "open", open_func);
-    fprintf(stderr, "DEBUG: JS_SetPropertyStr returned %d\n", ret);
+    JS_SetPropertyStr(ctx, cdb_obj, "open", JS_NewCFunction2(ctx, (JSCFunction *)js_cdb_open, "open", 1, JS_CFUNC_generic, 0));
     JS_SetPropertyStr(ctx, cdb_obj, "sheet", JS_NewCFunction2(ctx, (JSCFunction *)js_cdb_sheet, "sheet", 1, JS_CFUNC_generic, 0));
     JS_SetPropertyStr(ctx, cdb_obj, "close", JS_NewCFunction2(ctx, (JSCFunction *)js_cdb_close, "close", 0, JS_CFUNC_generic, 0));
     JS_SetPropertyStr(ctx, cdb_obj, "getSheetCount", JS_NewCFunction2(ctx, (JSCFunction *)js_cdb_get_sheet_count, "getSheetCount", 0, JS_CFUNC_generic, 0));
     JS_SetPropertyStr(ctx, cdb_obj, "getSheetNames", JS_NewCFunction2(ctx, (JSCFunction *)js_cdb_get_sheet_names, "getSheetNames", 0, JS_CFUNC_generic, 0));
 
     JSValue global_obj = JS_GetGlobalObject(ctx);
-    ret = JS_SetPropertyStr(ctx, global_obj, "CDB", cdb_obj);
-    fprintf(stderr, "DEBUG: Set CDB returned %d\n", ret);
+    JS_SetPropertyStr(ctx, global_obj, "CDB", cdb_obj);
     JS_FreeValue(ctx, global_obj);
 
     printf("=== CastleDB QuickJS Test ===\n\n");
@@ -474,11 +475,18 @@ int main(int argc, char **argv) {
 
     const char *script_fmt = 
         "var db = CDB.open('%s');\n"
+        "console.log('db type: ' + typeof db);\n"
+        "console.log('getSheetCount type: ' + typeof db.getSheetCount);\n"
         "var count = db.getSheetCount();\n"
+        "console.log('Sheet count: ' + count);\n"
         "var names = db.getSheetNames();\n"
+        "console.log('Sheet names: ' + JSON.stringify(names));\n"
         "var weapons = db.sheet('武器');\n"
+        "console.log('weapons type: ' + typeof weapons);\n"
         "var rowCount = weapons.getRowCount();\n"
-        "db.close();\n";
+        "console.log('Row count: ' + rowCount);\n"
+        "db.close();\n"
+        "console.log('Done!');\n";
 
     char full_script[4096];
     snprintf(full_script, sizeof(full_script), script_fmt, cdb_path);
