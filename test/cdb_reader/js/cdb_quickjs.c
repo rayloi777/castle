@@ -20,6 +20,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef countof
+#define countof(x) (sizeof(x) / sizeof((x)[0]))
+#endif
+
 typedef struct {
     CDB *db;
     int sheet_count;
@@ -237,7 +241,7 @@ static JSValue js_sheet_get_row_count(JSContext *ctx, JSValueConst thisVal, int 
 
 static JSValue js_sheet_get_row(JSContext *ctx, JSValueConst thisVal, int argc, JSValueConst *argv) {
     JSheet *jsheet = JS_GetOpaque(thisVal, js_sheet_class_id);
-    int index;
+    int32_t index;
     JSValue obj;
 
     if (!jsheet || argc < 1) {
@@ -360,9 +364,11 @@ static JSValue js_sheet_to_array(JSContext *ctx, JSValueConst thisVal, int argc,
                     val = JS_NewString(ctx, str ? str : "");
                     break;
                 }
-                default:
-                    val = JS_NewString(ctx, cdb_value_get_raw(row, c) ? cdb_value_get_raw(row, c) : "");
+                default: {
+                    const char *raw = cdb_value_get_raw(row, c);
+                    val = JS_NewString(ctx, raw ? raw : "");
                     break;
+                }
             }
             JS_SetPropertyUint32(ctx, rowArr, c, val);
         }
@@ -445,7 +451,7 @@ static JSValue js_row_get(JSContext *ctx, JSValueConst thisVal, int argc, JSValu
     JS_FreeCString(ctx, col_name);
 
     if (!col) {
-        JS_ThrowReferenceError(ctx, "Column not found: %s", col_name);
+        JS_ThrowReferenceError(ctx, "Column not found");
         return JS_EXCEPTION;
     }
 
@@ -482,11 +488,7 @@ static JSValue js_row_get(JSContext *ctx, JSValueConst thisVal, int argc, JSValu
         case CDB_TID:
         case CDB_TSTRING:
         case CDB_TIMAGE:
-        case CDB_TFILE: {
-            const char *str = cdb_value_get_string(row, col_index);
-            result = JS_NewString(ctx, str ? str : "");
-            break;
-        }
+        case CDB_TFILE:
         case CDB_TENUM: {
             const char *str = cdb_value_get_string(row, col_index);
             result = JS_NewString(ctx, str ? str : "");
@@ -502,9 +504,11 @@ static JSValue js_row_get(JSContext *ctx, JSValueConst thisVal, int argc, JSValu
             result = arr;
             break;
         }
-        default:
-            result = JS_NewString(ctx, cdb_value_get_raw(row, col_index) ? cdb_value_get_raw(row, col_index) : "");
+        default: {
+            const char *raw = cdb_value_get_raw(row, col_index);
+            result = JS_NewString(ctx, raw ? raw : "");
             break;
+        }
     }
 
     free(row);
@@ -604,9 +608,11 @@ static JSValue js_row_to_object(JSContext *ctx, JSValueConst thisVal, int argc, 
                 val = JS_NewString(ctx, str ? str : "");
                 break;
             }
-            default:
-                val = JS_NewString(ctx, cdb_value_get_raw(row, c) ? cdb_value_get_raw(row, c) : "");
+            default: {
+                const char *raw = cdb_value_get_raw(row, c);
+                val = JS_NewString(ctx, raw ? raw : "");
                 break;
+            }
         }
         JS_SetPropertyStr(ctx, obj, col_name, val);
     }
@@ -615,12 +621,32 @@ static JSValue js_row_to_object(JSContext *ctx, JSValueConst thisVal, int argc, 
     return obj;
 }
 
+static JSClassDef js_cdb_class = {
+    .class_name = "CDB",
+    .finalizer = js_cdb_finalizer,
+};
+
+static JSClassDef js_sheet_class = {
+    .class_name = "Sheet",
+    .finalizer = js_sheet_finalizer,
+};
+
+static JSClassDef js_column_class = {
+    .class_name = "Column",
+    .finalizer = js_column_finalizer,
+};
+
+static JSClassDef js_row_class = {
+    .class_name = "Row",
+    .finalizer = js_row_finalizer,
+};
+
 static const JSCFunctionListEntry js_cdb_funcs[] = {
     JS_CFUNC_DEF("open", 1, js_cdb_open),
     JS_CFUNC_DEF("sheet", 1, js_cdb_sheet),
     JS_CFUNC_DEF("close", 0, js_cdb_close),
     JS_CFUNC_DEF("getSheetNames", 0, js_cdb_get_sheet_names),
-    JS_CGETSET_DEF("sheetCount", js_cdb_get_sheet_count, NULL),
+    JS_CFUNC_DEF("getSheetCount", 0, js_cdb_get_sheet_count),
 };
 
 static const JSCFunctionListEntry js_sheet_funcs[] = {
@@ -631,9 +657,6 @@ static const JSCFunctionListEntry js_sheet_funcs[] = {
     JS_CFUNC_DEF("getRows", 0, js_sheet_get_rows),
     JS_CFUNC_DEF("find", 1, js_sheet_find),
     JS_CFUNC_DEF("toArray", 0, js_sheet_to_array),
-    JS_CGETSET_DEF("name", js_sheet_get_name, NULL),
-    JS_CGETSET_DEF("columns", js_sheet_get_columns, NULL),
-    JS_CGETSET_DEF("rowCount", js_sheet_get_row_count, NULL),
 };
 
 static const JSCFunctionListEntry js_column_funcs[] = {
@@ -642,11 +665,6 @@ static const JSCFunctionListEntry js_column_funcs[] = {
     JS_CFUNC_DEF("getTypeName", 0, js_column_get_type_name),
     JS_CFUNC_DEF("getEnumValues", 0, js_column_get_enum_values),
     JS_CFUNC_DEF("isOptional", 0, js_column_is_optional),
-    JS_CGETSET_DEF("name", js_column_get_name, NULL),
-    JS_CGETSET_DEF("type", js_column_get_type, NULL),
-    JS_CGETSET_DEF("typeName", js_column_get_type_name, NULL),
-    JS_CGETSET_DEF("enumValues", js_column_get_enum_values, NULL),
-    JS_CGETSET_DEF("optional", js_column_is_optional, NULL),
 };
 
 static const JSCFunctionListEntry js_row_funcs[] = {
@@ -657,52 +675,45 @@ static const JSCFunctionListEntry js_row_funcs[] = {
 };
 
 static int js_cdb_init(JSContext *ctx, JSModuleDef *m) {
-    JSValue cdb_class, sheet_class, column_class, row_class;
+    JSValue proto_cdb, proto_sheet, proto_column, proto_row;
 
     JS_NewClassID(&js_cdb_class_id);
     JS_NewClassID(&js_sheet_class_id);
     JS_NewClassID(&js_column_class_id);
     JS_NewClassID(&js_row_class_id);
 
-    cdb_class = JS_NewClass(JS_GetRuntime(ctx), js_cdb_class_id, "CDB", js_cdb_finalizer);
-    JS_SetClassProto(ctx, cdb_class, JS_NULL);
+    JS_NewClass(JS_GetRuntime(ctx), js_cdb_class_id, &js_cdb_class);
+    JS_NewClass(JS_GetRuntime(ctx), js_sheet_class_id, &js_sheet_class);
+    JS_NewClass(JS_GetRuntime(ctx), js_column_class_id, &js_column_class);
+    JS_NewClass(JS_GetRuntime(ctx), js_row_class_id, &js_row_class);
 
-    sheet_class = JS_NewClass(JS_GetRuntime(ctx), js_sheet_class_id, "Sheet", js_sheet_finalizer);
-    JS_SetClassProto(ctx, sheet_class, JS_NULL);
-
-    column_class = JS_NewClass(JS_GetRuntime(ctx), js_column_class_id, "Column", js_column_finalizer);
-    JS_SetClassProto(ctx, column_class, JS_NULL);
-
-    row_class = JS_NewClass(JS_GetRuntime(ctx), js_row_class_id, "Row", js_row_finalizer);
-    JS_SetClassProto(ctx, row_class, JS_NULL);
-
-    JSValue proto_cdb = JS_NewObject(ctx);
+    proto_cdb = JS_NewObject(ctx);
     JS_SetPropertyFunctionList(ctx, proto_cdb, js_cdb_funcs, countof(js_cdb_funcs));
     JS_SetClassProto(ctx, js_cdb_class_id, proto_cdb);
 
-    JSValue proto_sheet = JS_NewObject(ctx);
+    proto_sheet = JS_NewObject(ctx);
     JS_SetPropertyFunctionList(ctx, proto_sheet, js_sheet_funcs, countof(js_sheet_funcs));
     JS_SetClassProto(ctx, js_sheet_class_id, proto_sheet);
 
-    JSValue proto_column = JS_NewObject(ctx);
+    proto_column = JS_NewObject(ctx);
     JS_SetPropertyFunctionList(ctx, proto_column, js_column_funcs, countof(js_column_funcs));
     JS_SetClassProto(ctx, js_column_class_id, proto_column);
 
-    JSValue proto_row = JS_NewObject(ctx);
+    proto_row = JS_NewObject(ctx);
     JS_SetPropertyFunctionList(ctx, proto_row, js_row_funcs, countof(js_row_funcs));
     JS_SetClassProto(ctx, js_row_class_id, proto_row);
 
     JSValue obj = JS_NewObject(ctx);
     JS_SetPropertyFunctionList(ctx, obj, js_cdb_funcs, countof(js_cdb_funcs));
-    JSModuleAddExport(m, "CDB", obj);
+    JS_AddModuleExport(ctx, m, "CDB");
+    JS_SetModuleExport(ctx, m, "CDB", obj);
 
     return 0;
 }
 
 static JSModuleDef *js_init_module(JSContext *ctx, const char *module_name) {
     JSModuleDef *m;
-    m = JS_NewModule(ctx, module_name);
-    js_cdb_init(ctx, m);
+    m = JS_NewCModule(ctx, module_name, js_cdb_init);
     return m;
 }
 

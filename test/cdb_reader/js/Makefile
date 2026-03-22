@@ -1,12 +1,11 @@
 # CastleDB QuickJS Extension Makefile
 
-# QuickJS paths (adjust as needed)
-QUICKJS_DIR ?= /usr/local/include/quickjs
-QUICKJS_LIB ?= /usr/local/lib
+# QuickJS paths
+QUICKJS_DIR ?= /opt/homebrew/include/quickjs
 
 CC = gcc
 CFLAGS = -Wall -Wextra -pedantic -std=c99 -O2 -fPIC
-LDFLAGS = -shared
+LDFLAGS = -shared -undefined dynamic_lookup
 
 # Directories
 CDB_DIR = ..
@@ -24,7 +23,7 @@ QUICKJS_SRC = cdb_quickjs.c
 INCLUDES = -I$(CDB_DIR) -I$(QUICKJS_DIR)
 
 # Libraries
-LIBS = -lquickjs
+LIBS = -lm
 
 .PHONY: all clean test
 
@@ -49,7 +48,7 @@ test: all
 	@echo "  qjs -e \"var CDB = require('./cdb_module.js').CDB; var db = CDB.open('../item.cdb'); print(db.getSheetNames()); db.close();\""
 
 install: all
-	mkdir -p $(QUICKJS_LIB)/addons
-	cp $(BUILD_DIR)/$(MODULE_FILE) $(QUICKJS_LIB)/addons/
-	cp cdb_module.js $(QUICKJS_LIB)/addons/cdb.js
-	@echo "Installed to $(QUICKJS_LIB)/addons/"
+	mkdir -p /opt/homebrew/lib/addons
+	cp $(BUILD_DIR)/$(MODULE_FILE) /opt/homebrew/lib/addons/
+	cp cdb_module.js /opt/homebrew/lib/addons/cdb.js
+	@echo "Installed to /opt/homebrew/lib/addons/"
