@@ -180,40 +180,7 @@ class JqPage extends vdom.Server {
 				fs.attr("nwworkingdir", "");
 				result(path);
 			});
-        #if nwjs
-        // ARM64 nwsaveas crash fallback (Issue #8334)
-        try {
-            fs.click();
-        } catch(e:Dynamic) {
-            // Fallback: use blob download when nwsaveas crashes on ARM64
-            var suggestedName = fpath.file != null && fpath.file.length > 0 ? fpath.file : "data.cdb";
-            if( Std.is(data, String) ) {
-                var blob : Dynamic = js.Syntax.code("new Blob([{0}], { type: 'text/plain;charset=utf-8' })", data);
-                var url = js.Syntax.code("URL.createObjectURL({0})", blob);
-                var a : Dynamic = js.Browser.document.createElement("a");
-                a.href = url;
-                a.download = suggestedName;
-                a.style.display = "none";
-                js.Browser.document.body.appendChild(a);
-                a.click();
-                js.Syntax.code("URL.revokeObjectURL({0})", url);
-            } else if( Std.is(data, haxe.io.Bytes) ) {
-                var bytes : haxe.io.Bytes = data;
-                var blob : Dynamic = js.Syntax.code("new Blob([new Uint8Array({0}.b) ], { type: 'application/octet-stream' })", bytes);
-                var url = js.Syntax.code("URL.createObjectURL({0})", blob);
-                var a : Dynamic = js.Browser.document.createElement("a");
-                a.href = url;
-                a.download = suggestedName;
-                a.style.display = "none";
-                js.Browser.document.body.appendChild(a);
-                a.click();
-                js.Syntax.code("URL.revokeObjectURL({0})", url);
-            }
-            result(null);
-        }
-        #else
-        fs.click();
-        #end
+			fs.click();
 
 		case "animate":
 

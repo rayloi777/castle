@@ -259,18 +259,7 @@ class Main extends Model {
 
     
     function actionSaveAs() {
-        #if nwjs
-        try {
-            J("#fileSaveAs").click();
-        } catch(e: Dynamic) {
-            // ARM64 fallback: use blob download when nwsaveas crashes
-            var suggestedName = prefs.curFile != null ? prefs.curFile.split("/").pop().split("\\").pop() : "data.cdb";
-            var content = cdb.Parser.save(@:privateAccess base.data);
-            saveBlobDownload(content, suggestedName);
-        }
-        #else
         J("#fileSaveAs").click();
-        #end
     }
 
 	function searchFilter( filter : String ) {
@@ -2687,14 +2676,7 @@ class Main extends Model {
 				j.remove();
 			});
 			i.appendTo(J("body"));
-			try {
-				i.click();
-			} catch(e: Dynamic) {
-				// ARM64 fallback: use blob download
-				var suggestedName = prefs.curFile != null ? prefs.curFile.split("/").pop().split("\\").pop() : "data.cdb";
-				var content = cdb.Parser.save(@:privateAccess base.data);
-				saveBlobDownload(content, suggestedName);
-			}
+			i.click();
         };
 		mclean.click = function(_) {
 			var lcount = @:privateAccess base.cleanLayers();

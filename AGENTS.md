@@ -70,24 +70,26 @@ Navigate to `http://localhost:8080/index-browser.html`
 - Does not include the Level Editor functionality
 - Requires HTTPS or localhost for File System Access API
 
-### macOS ARM64 Build (NWJS v0.109.0)
+### macOS ARM64 Build (NWJS v0.109.1)
 
-NW.js v0.109.0 provides **native ARM64 support** for macOS without Rosetta 2 translation.
+NW.js v0.109.1 provides **native ARM64 support** for macOS without Rosetta 2 translation.
+
+**Fixed Issues:**
+- `nwsaveas` (Save As dialog) crash on ARM64 (Issue #8334) - **FIXED in v0.109.1**
 
 **Known Issues:**
-- `nwsaveas` (Save As dialog) may crash on ARM64 (Issue #8334) - fallback to blob download is implemented
 - Dev Tools menu is removed due to crash on ARM64 (Issue #8302)
 
-1. **Download NWJS v0.109.0 ARM64:**
+1. **Download NWJS v0.109.1 ARM64:**
 ```bash
 cd bin
 # Backup old version if exists
-mv nwjs.app nwjs.app.v78.bak 2>/dev/null || true
+mv nwjs.app nwjs.app.v109.0.bak 2>/dev/null || true
 
 # Download ARM64 build
-curl -L -o nwjs.zip "https://dl.nwjs.io/v0.109.0/nwjs-v0.109.0-osx-arm64.zip"
+curl -L -o nwjs.zip "https://dl.nwjs.io/v0.109.1/nwjs-v0.109.1-osx-arm64.zip"
 unzip -q nwjs.zip
-mv nwjs-v0.109.0-osx-arm64/nwjs.app ./
+mv nwjs-v0.109.1-osx-arm64/nwjs.app ./
 rm nwjs.zip
 mkdir -p nwjs.app/Contents/Resources/app.nw
 ```
@@ -116,8 +118,8 @@ open bin/nwjs.app
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Open File | ✅ Works | Standard HTML file dialog |
-| Save | ⚠️ Fallback | Uses blob download to Downloads folder |
-| Export XML | ⚠️ Fallback | Uses blob download |
+| Save | ✅ Works | System Save As dialog works (nwsaveas fixed in v0.109.1) |
+| Export XML | ✅ Works | System Save As dialog works |
 | Dev Tools | ❌ Removed | Crashes on ARM64 |
 | Other features | ✅ Works | Full functionality |
 
