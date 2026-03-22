@@ -183,11 +183,12 @@ static int skip_to_end(int idx, jsmntok_t *tokens) {
     if (tok->type == JSMN_OBJECT) {
         int end = idx + 1;
         for (int i = 0; i < tok->size; i++) {
-            end++;
+            end++; // skip key
             if (tokens[end].type == JSMN_OBJECT || tokens[end].type == JSMN_ARRAY) {
-                end = skip_to_end(end, tokens);
+                end = skip_to_end(end, tokens); // recursed, already past value
+            } else {
+                end++; // skip primitive value
             }
-            end++;
         }
         return end;
     } else if (tok->type == JSMN_ARRAY) {
