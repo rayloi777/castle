@@ -15,7 +15,7 @@
  */
 
 #include "cdb_reader.h"
-#include "jsmn.h"
+#include "jsmn/jsmn.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -183,13 +183,11 @@ static int skip_to_end(int idx, jsmntok_t *tokens) {
     if (tok->type == JSMN_OBJECT) {
         int end = idx + 1;
         for (int i = 0; i < tok->size; i++) {
+            end++;
             if (tokens[end].type == JSMN_OBJECT || tokens[end].type == JSMN_ARRAY) {
                 end = skip_to_end(end, tokens);
-            } else if (tokens[end].type == JSMN_STRING || tokens[end].type == JSMN_PRIMITIVE) {
-                end++;
-            } else {
-                end++;
             }
+            end++;
         }
         return end;
     } else if (tok->type == JSMN_ARRAY) {
@@ -618,6 +616,10 @@ CDBRow *cdb_get_row(CDBSheet *sheet, int index) {
     return row;
 }
 
+void cdb_row_free(CDBRow *row) {
+    free(row);
+}
+
 const char *cdb_value_get_string(CDBRow *row, int column) {
     if (!row || column < 0 || column >= row->sheet->column_count) return NULL;
     char *val = row->sheet->lines[row->row_index][column];
@@ -662,23 +664,80 @@ int cdb_value_get_type(CDBRow *row, int column) {
     return row->sheet->columns[column].type;
 }
 
+static int count_flags_in_string(const char *flags_str) {
+    if (!flags_str || strlen(flags_str) == 0) return 0;
+    int count = 1;
+    for (const char *p = flags_str; *p; p++) {
+        if (*p == ',') count++;
+    }
+    return count;
+}
+
 int cdb_value_get_flags_count(CDBRow *row, int column) {
-    (void)row;
-    (void)column;
-    return 0;
+    if (!row || column < 0 || column >= row->sheet->column_count) return 0;
+    if (row->sheet->columns[column].type != CDB_TFLAGS) return 0;
+    char *val = row->sheet->lines[row->row_index][column];
+    if (!val || strlen(val) == 0) return 0;
+    return count_flags_in_string(val);
 }
 
 const char *cdb_value_get_flag(CDBRow *row, int column, int index) {
-    (void)row;
-    (void)column;
-    (void)index;
+    if (!row || column < 0 || column >= row->sheet->column_count) return NULL;
+    if (row->sheet->columns[column].type != CDB_TFLAGS) return NULL;
+    char *val = row->sheet->lines[row->row_index][column];
+    if (!val || strlen(val) == 0) return NULL;
+    
+    int count = count_flags_in_string(val);
+    if (index < 0 || index >= count) return NULL;
+    
+    static char buffer[256];
+    strncpy(buffer, val, sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';
+    
+    char *token;
+    char *saveptr;
+    int i = 0;
+    token = strtok_r(buffer, ",", &saveptr);
+    while (token != NULL) {
+        while (*token == ' ' || *token == '\t') token++;
+        if (i == index) {
+            size_t len = strlen(token);
+            if (len > 0 && token[len - 1] == ' ') {
+                token[len - 1] = '\0';
+            }
+            return token;
+        }
+        i++;
+        token = strtok_r(NULL, ",", &saveptr);
+    }
     return NULL;
 }
 
 int cdb_value_has_flag(CDBRow *row, int column, const char *flag) {
-    (void)row;
-    (void)column;
-    (void)flag;
+    if (!row || column < 0 || column >= row->sheet->column_count) return 0;
+    if (row->sheet->columns[column].type != CDB_TFLAGS) return 0;
+    if (!flag) return 0;
+    char *val = row->sheet->lines[row->row_index][column];
+    if (!val || strlen(val) == 0) return 0;
+    
+    static char buffer[256];
+    strncpy(buffer, val, sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';
+    
+    char *token;
+    char *saveptr;
+    token = strtok_r(buffer, ",", &saveptr);
+    while (token != NULL) {
+        while (*token == ' ' || *token == '\t') token++;
+        size_t len = strlen(token);
+        if (len > 0 && token[len - 1] == ' ') {
+            token[len - 1] = '\0';
+        }
+        if (strcmp(token, flag) == 0) {
+            return 1;
+        }
+        token = strtok_r(NULL, ",", &saveptr);
+    }
     return 0;
 }
 

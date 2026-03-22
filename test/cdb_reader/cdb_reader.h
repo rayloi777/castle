@@ -109,6 +109,7 @@ const char **cdb_column_get_enum_values_ptr(CDBColumn *column);
 
 int cdb_row_count(CDBSheet *sheet);
 CDBRow *cdb_get_row(CDBSheet *sheet, int index);
+void cdb_row_free(CDBRow *row);
 
 const char *cdb_value_get_string(CDBRow *row, int column);
 int cdb_value_get_int(CDBRow *row, int column);

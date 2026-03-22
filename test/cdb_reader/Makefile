@@ -13,7 +13,7 @@ LIB_NAME = cdb_reader
 LIB_FILE = lib$(LIB_NAME).a
 
 SOURCES = cdb_reader.c
-HEADERS = cdb_reader.h jsmn.h
+HEADERS = cdb_reader.h jsmn/jsmn.h
 
 .PHONY: all clean install example
 
