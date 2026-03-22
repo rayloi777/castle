@@ -9,7 +9,7 @@ ul, li {
 	list-style : none;
 }
 body, td, th, li, p, a, input, select {
-	font-family : Verdana, serif;
+	font-family : 'Noto Sans TC', Verdana, serif;
 	font-size : 10pt;
 }
 a {
