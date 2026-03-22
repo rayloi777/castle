@@ -259,18 +259,18 @@ class Main extends Model {
 
     
     function actionSaveAs() {
+        #if nwjs
         try {
             J("#fileSaveAs").click();
         } catch(e: Dynamic) {
-            js.Browser.console.error("[ERROR] actionSaveAs click failed: " + Std.string(e));
+            // ARM64 fallback: use blob download when nwsaveas crashes
             var suggestedName = prefs.curFile != null ? prefs.curFile.split("/").pop().split("\\").pop() : "data.cdb";
-            try {
-                var content = cdb.Parser.save(@:privateAccess base.data);
-                saveBlobDownload(content, suggestedName);
-            } catch(e2: Dynamic) {
-                js.Browser.console.error("[ERROR] cdb.Parser.save failed: " + Std.string(e2));
-            }
+            var content = cdb.Parser.save(@:privateAccess base.data);
+            saveBlobDownload(content, suggestedName);
         }
+        #else
+        J("#fileSaveAs").click();
+        #end
     }
 
 	function searchFilter( filter : String ) {
@@ -1603,7 +1603,10 @@ class Main extends Model {
 			}
 			var v = Reflect.field(props, c.name);
 			var l = J("<tr>").attr("colName",c.name).appendTo(content);
-			var th = J("<th>").text(c.name).appendTo(l);
+			var th = J("<th>");
+			J("<div>").addClass("col-name").text(c.name).appendTo(th);
+			J("<div>").addClass("col-type").text(base.typeStr(c.type)).appendTo(th);
+			th.appendTo(l);
 			var td = J("<td>").addClass("c").addClass("t_" + c.type.getName().substr(1).toLowerCase()).html(valueHtml(c, v, sheet, props)).appendTo(l);
 			var index = index++;
 			l.click(function(e) {
@@ -1718,8 +1721,9 @@ class Main extends Model {
 		for( cindex in 0...sheet.columns.length ) {
 			var c = sheet.columns[cindex];
 			var col = J("<th>");
-			col.text(c.name);
 			col.addClass( "t_"+c.type.getName().substr(1).toLowerCase() );
+			J("<div>").addClass("col-name").text(c.name).appendTo(col);
+			J("<div>").addClass("col-type").text(base.typeStr(c.type)).appendTo(col);
 			if( sheet.props.displayColumn == c.name )
 				col.addClass("display");
 			col.mousedown(function(e) {
@@ -2676,20 +2680,21 @@ class Main extends Model {
 			i.click();
 		};
 		msave.click = function(_) {
-            var i = J("<input>").attr("type", "file").attr("nwsaveas","new.cdb").css("display","none").change(function(e) {
-                var j = JTHIS;
-                prefs.curFile = j.val();
-                save();
-                j.remove();
-            });
-            i.appendTo(J("body"));
-            try {
-                i.click();
-            } catch(e: Dynamic) {
-                var suggestedName = prefs.curFile != null ? prefs.curFile.split("/").pop().split("\\").pop() : "data.cdb";
-                var content = cdb.Parser.save(@:privateAccess base.data);
-                saveBlobDownload(content, suggestedName);
-            }
+			var i = J("<input>").attr("type", "file").attr("nwsaveas","new.cdb").css("display","none").change(function(e) {
+				var j = JTHIS;
+				prefs.curFile = j.val();
+				save();
+				j.remove();
+			});
+			i.appendTo(J("body"));
+			try {
+				i.click();
+			} catch(e: Dynamic) {
+				// ARM64 fallback: use blob download
+				var suggestedName = prefs.curFile != null ? prefs.curFile.split("/").pop().split("\\").pop() : "data.cdb";
+				var content = cdb.Parser.save(@:privateAccess base.data);
+				saveBlobDownload(content, suggestedName);
+			}
         };
 		mclean.click = function(_) {
 			var lcount = @:privateAccess base.cleanLayers();

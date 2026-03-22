@@ -357,6 +357,14 @@ div#menu ul.sheets li.active {
 .castle tr.head .display, .dialog-floating tr.head .display {
 	font-style : italic;
 }
+.castle th .col-name, .dialog-floating th .col-name {
+	font-weight : bold;
+}
+.castle th .col-type, .dialog-floating th .col-type {
+	font-size : 10px;
+	font-weight : normal;
+	color : #999;
+}
 .castle tr.selected, .castle td.selected, .dialog-floating tr.selected, .dialog-floating td.selected {
 	background-color : #EEE;
 }
