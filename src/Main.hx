@@ -245,19 +245,33 @@ class Main extends Model {
 			save();
 	}
 
-	function actionSaveAs() {
-		#if nwjs
-		try {
-			J("#fileSaveAs").click();
-		} catch(e: Dynamic) {
-			var suggestedName = prefs.curFile != null ? prefs.curFile.split("/").pop().split("\\").pop() : "data.cdb";
-			var content = cdb.Parser.save(@:privateAccess base.data);
-			js.browser.BrowserFile.saveFile(content, suggestedName);
-		}
-		#else
-		J("#fileSaveAs").click();
-		#end
-	}
+    function saveBlobDownload(content: String, filename: String) {
+        var blob = new js.html.Blob([content], { type: "text/plain;charset=utf-8" });
+        var url = js.html.URL.createObjectURL(blob);
+        var a : Dynamic = js.Browser.document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.style.display = "none";
+        js.Browser.document.body.appendChild(a);
+        a.click();
+        js.html.URL.revokeObjectURL(url);
+    }
+
+    
+    function actionSaveAs() {
+        try {
+            J("#fileSaveAs").click();
+        } catch(e: Dynamic) {
+            js.Browser.console.error("[ERROR] actionSaveAs click failed: " + Std.string(e));
+            var suggestedName = prefs.curFile != null ? prefs.curFile.split("/").pop().split("\\").pop() : "data.cdb";
+            try {
+                var content = cdb.Parser.save(@:privateAccess base.data);
+                saveBlobDownload(content, suggestedName);
+            } catch(e2: Dynamic) {
+                js.Browser.console.error("[ERROR] cdb.Parser.save failed: " + Std.string(e2));
+            }
+        }
+    }
 
 	function searchFilter( filter : String ) {
 		if( filter == "" ) filter = null;
@@ -710,19 +724,27 @@ class Main extends Model {
 				v + "";
 			}
 		case TId:
-			v == "" ? '<span class="error">#MISSING</span>' : (base.getSheet(sheet.name).index.get(v).obj == obj ? v : '<span class="error">#DUP($v)</span>');
+			if( v == "" )
+				'<span class="error">#MISSING</span>'
+			else if( base.getSheet(sheet.name).index.get(v).obj == obj )
+				v
+			else
+				'<span class="error">#DUP($v)</span>';
 		case TString, TLayer(_):
-			v == "" ? "&nbsp;" : StringTools.htmlEscape(v);
+			if( v == "" ) "&nbsp;" else StringTools.htmlEscape(v);
 		case TRef(sname):
 			if( v == "" )
-				'<span class="error">#MISSING</span>';
+				'<span class="error">#MISSING</span>'
 			else {
 				var s = base.getSheet(sname);
 				var i = s.index.get(v);
-				i == null ? '<span class="error">#REF($v)</span>' : (i.ico == null ? "" : tileHtml(i.ico,true)+" ") + StringTools.htmlEscape(i.disp);
+				if( i == null )
+					'<span class="error">#REF($v)</span>'
+				else
+					(i.ico == null ? "" : tileHtml(i.ico,true)+" ") + StringTools.htmlEscape(i.disp);
 			}
 		case TBool:
-			v?"Y":"N";
+			if( v ) "Y" else "N";
 		case TEnum(values):
 			values[v];
 		case TImage:
@@ -754,8 +776,8 @@ class Main extends Model {
 					out.push("...");
 					break;
 				}
-				var vstr = v;
-				if( v.indexOf("<") >= 0 ) {
+				var vstr = Std.string(v);
+				if( vstr.indexOf("<") >= 0 ) {
 					vstr = ~/<img src="[^"]+" style="display:none"[^>]+>/g.replace(vstr, "");
 					vstr = ~/<img src="[^"]+"\/>/g.replace(vstr, "[I]");
 					vstr = ~/<div id="[^>]+><\/div>/g.replace(vstr, "[D]");
@@ -789,14 +811,14 @@ class Main extends Model {
 				str += out.join(",");
 				str += ")";
 			}
-			str;
+			return str;
 		case TFlags(values):
 			var v : Int = v;
 			var flags = [];
 			for( i in 0...values.length )
 				if( v & (1 << i) != 0 )
 					flags.push(StringTools.htmlEscape(values[i]));
-			flags.length == 0 ? String.fromCharCode(0x2205) : flags.join("|<wbr>");
+			if( flags.length == 0 ) String.fromCharCode(0x2205) else flags.join("|<wbr>");
 		case TColor:
 			var id = UID++;
 			'<div class="color" style="background-color:#${StringTools.hex(v,6)}"></div>';
@@ -819,7 +841,7 @@ class Main extends Model {
 			var v : cdb.Types.TileLayer = v;
 			var path = getAbsPath(v.file);
 			if( !quickExists(path) )
-				'<span class="error">' + v.file + '</span>';
+				'<span class="error">' + v.file + '</span>'
 			else
 				'#DATA';
 		case TDynamic:
@@ -1506,6 +1528,7 @@ class Main extends Model {
 	}
 
 	function refresh() {
+		log("[DEBUG] refresh() called, viewSheet = " + (viewSheet != null ? viewSheet.name : "null"));
 		var t = J("<table>");
 		checkCursor = true;
 		fillTable(t, viewSheet);
@@ -1722,7 +1745,15 @@ class Main extends Model {
 				updateClasses(v, c, val);
 
 				var html = valueHtml(c, val, sheet, obj);
-				if( html == "&nbsp;" ) v.text(" ") else if( html.indexOf('<') < 0 && html.indexOf('&') < 0 ) v.text(html) else v.html(html);
+				if( html == null ) {
+					v.text("");
+				} else if( html == "&nbsp;" ) {
+					v.text(" ");
+				} else if( html.indexOf('<') < 0 && html.indexOf('&') < 0 ) {
+					v.text(html);
+				} else {
+					v.html(html);
+				}
 				v.data("index", cindex);
 				v.click(function(e) {
 					if( inTodo ) {
@@ -2128,6 +2159,7 @@ class Main extends Model {
 	}
 
 	function selectSheet( s : Sheet, manual = true ) {
+		log("[DEBUG] selectSheet called with sheet: " + (s != null ? s.name : "null"));
 		viewSheet = s;
 		pages.curPage = -1;
 		cursor = sheetCursors.get(s.name);
@@ -2144,8 +2176,12 @@ class Main extends Model {
 			level = null;
 		}
 		prefs.curSheet = Lambda.indexOf(base.sheets, s);
+		log("[DEBUG] prefs.curSheet = " + prefs.curSheet);
 		J("#sheets li").removeClass("active").filter("#sheet_" + prefs.curSheet).addClass("active");
-		if( manual ) refresh();
+		if( manual ) {
+			log("[DEBUG] calling refresh()");
+			refresh();
+		}
 	}
 
 	function selectLevel( l : Level ) {
@@ -2509,14 +2545,19 @@ class Main extends Model {
 	}
 
 	public function initContent() {
+		log("[DEBUG] initContent() called, base.sheets.length = " + base.sheets.length);
 		(untyped J("body").spectrum).clearAll();
 		var sheets = J("ul#sheets");
 		sheets.children().remove();
 		for( i in 0...base.sheets.length ) {
 			var s = base.sheets[i];
+			log("[DEBUG] Processing sheet " + i + ": " + s.name + ", hide=" + s.props.hide);
 			if( s.props.hide ) continue;
 			var li = J("<li>");
-			li.text(s.name).attr("id", "sheet_" + i).appendTo(sheets).click(function(_) selectSheet(s)).dblclick(function(_) {
+			li.text(s.name).attr("id", "sheet_" + i).appendTo(sheets).click(function(_) {
+				log("[DEBUG] Click handler called for sheet: " + s.name);
+				selectSheet(s);
+			}).dblclick(function(_) {
 				li.empty();
 				J("<input>").val(s.name).appendTo(li).focus().blur(function(_) {
 					li.text(s.name);
@@ -2635,25 +2676,21 @@ class Main extends Model {
 			i.click();
 		};
 		msave.click = function(_) {
-			var i = J("<input>").attr("type", "file").attr("nwsaveas","new.cdb").css("display","none").change(function(e) {
-				var j = JTHIS;
-				prefs.curFile = j.val();
-				save();
-				j.remove();
-			});
-			i.appendTo(J("body"));
-			#if nwjs
-			try {
-				i.click();
-			} catch(e: Dynamic) {
-				var suggestedName = prefs.curFile != null ? prefs.curFile.split("/").pop().split("\\").pop() : "data.cdb";
-				var content = cdb.Parser.save(@:privateAccess base.data);
-				js.browser.BrowserFile.saveFile(content, suggestedName);
-			}
-			#else
-			i.click();
-			#end
-		};
+            var i = J("<input>").attr("type", "file").attr("nwsaveas","new.cdb").css("display","none").change(function(e) {
+                var j = JTHIS;
+                prefs.curFile = j.val();
+                save();
+                j.remove();
+            });
+            i.appendTo(J("body"));
+            try {
+                i.click();
+            } catch(e: Dynamic) {
+                var suggestedName = prefs.curFile != null ? prefs.curFile.split("/").pop().split("\\").pop() : "data.cdb";
+                var content = cdb.Parser.save(@:privateAccess base.data);
+                saveBlobDownload(content, suggestedName);
+            }
+        };
 		mclean.click = function(_) {
 			var lcount = @:privateAccess base.cleanLayers();
 			var icount = 0;
@@ -2694,25 +2731,22 @@ class Main extends Model {
 		mfile.submenu = mfiles;
 
 		mexport.click = function(_) {
-			var lang = new cdb.Lang(@:privateAccess base.data);
-			var xml = lang.buildXML();
-			var i = J("<input>").attr("type", "file").attr("nwsaveas","export.xml").css("display","none").change(function(e) {
-				var j = JTHIS;
-				var file = j.val();
-				sys.io.File.saveContent(file, String.fromCharCode(0xFEFF)+xml); // prefix with BOM
-				j.remove();
-			});
-			i.appendTo(J("body"));
-			#if nwjs
-			try {
-				i.click();
-			} catch(e: Dynamic) {
-				js.browser.BrowserFile.saveFile(String.fromCharCode(0xFEFF)+xml, "export.xml");
-			}
-			#else
-			i.click();
-			#end
-		};
+            var lang = new cdb.Lang(@:privateAccess base.data);
+            var xml = lang.buildXML();
+            var i = J("<input>").attr("type", "file").attr("nwsaveas","export.xml").css("display","none").change(function(e) {
+                var j = JTHIS;
+                var file = j.val();
+                sys.io.File.saveContent(file, String.fromCharCode(0xFEFF)+xml); // prefix with BOM
+                j.remove();
+            });
+            i.appendTo(J("body"));
+            try {
+                i.click();
+            } catch(e: Dynamic) {
+                var content = String.fromCharCode(0xFEFF)+xml;
+                saveBlobDownload(content, "export.xml");
+            }
+        };
 
 		if(Sys.systemName().indexOf("Mac") != -1) {
 			menu.createMacBuiltin("CastleDB", {hideEdit: false, hideWindow: true}); // needed so copy&paste inside INPUTs work
@@ -2755,7 +2789,15 @@ class Main extends Model {
 	}
 
 	function getFileTime() : Float {
-		return try sys.FileSystem.stat(prefs.curFile).mtime.getTime()*1. catch( e : Dynamic ) 0.;
+		if (prefs.curFile == null) {
+			log("[DEBUG] getFileTime: curFile is null, returning 0");
+			return 0;
+		}
+		log("[DEBUG] getFileTime: stat " + prefs.curFile);
+		return try sys.FileSystem.stat(prefs.curFile).mtime.getTime()*1. catch( e : Dynamic ) {
+			log("[ERROR] getFileTime stat failed: " + Std.string(e));
+			0.;
+		};
 	}
 
 	function checkTime() {
@@ -2786,17 +2828,144 @@ class Main extends Model {
 	}
 
 	override function save( history = true ) {
-		super.save(history);
-		lastSave = getFileTime();
+		log("[DEBUG] save() called, prefs.curFile = " + prefs.curFile);
+		try {
+			super.save(history);
+			lastSave = getFileTime();
+			log("[DEBUG] save() completed successfully");
+		} catch(e: Dynamic) {
+			log("[ERROR] save() failed: " + Std.string(e));
+		}
 	}
 
 	public static var inst : Main;
+	static var debugLog : Array<String> = [];
+	static var debugMinimized = true;
+	static var debugDragging = false;
+	static var debugDragOffsetX = 0;
+	static var debugDragOffsetY = 0;
+	
+	static function log(msg: String) {
+		debugLog.push(msg);
+		updateDebugPanel();
+		js.Browser.console.log(msg);
+	}
+	
+	static function updateDebugPanel() {
+		var content = js.Browser.document.getElementById("debug-content");
+		if (content != null) {
+			content.textContent = debugLog.join("\n");
+			if (!debugMinimized) {
+				content.scrollTop = content.scrollHeight;
+			}
+		}
+	}
+	
+	static function createDebugPanel() {
+		var container = js.Browser.document.createElement("div");
+		container.id = "debug-container";
+		container.style.cssText = "position:fixed;top:10px;right:10px;width:400px;max-height:300px;background:#1a1a1a;border:1px solid #0f0;border-radius:5px;z-index:999999;font-family:monospace;font-size:11px;box-shadow:0 4px 10px rgba(0,0,0,0.5);display:flex;flex-direction:column;";
+		
+		// Header
+		var header = js.Browser.document.createElement("div");
+		header.id = "debug-header";
+		header.style.cssText = "background:#0a0;color:#fff;padding:5px 10px;cursor:move;border-radius:5px 5px 0 0;user-select:none;flex-shrink:0;";
+		header.textContent = "[DEBUG]";
+		
+		// Buttons container
+		var buttons = js.Browser.document.createElement("span");
+		buttons.style.cssText = "float:right;margin-left:10px;";
+		
+		// Toggle button
+		var toggle = js.Browser.document.createElement("span");
+		toggle.id = "debug-toggle";
+		toggle.style.cssText = "cursor:pointer;margin-left:5px;";
+		toggle.textContent = "[-]";
+		buttons.appendChild(toggle);
+		
+		// Clear button
+		var clearBtn = js.Browser.document.createElement("span");
+		clearBtn.id = "debug-clear";
+		clearBtn.style.cssText = "cursor:pointer;";
+		clearBtn.textContent = "[X]";
+		buttons.appendChild(clearBtn);
+		
+		header.appendChild(buttons);
+		
+		// Content
+		var content = js.Browser.document.createElement("div");
+		content.id = "debug-content";
+		content.style.cssText = "display:block;flex:1;overflow:auto;padding:5px;color:#0f0;background:#000;font-family:monospace;font-size:11px;white-space:pre-wrap;word-break:break-all;";
+		
+		container.appendChild(header);
+		container.appendChild(content);
+		js.Browser.document.body.appendChild(container);
+		
+		// Event handlers
+		toggle.onclick = function() {
+			debugMinimized = !debugMinimized;
+			content.style.display = debugMinimized ? "none" : "block";
+			toggle.textContent = debugMinimized ? "[+]" : "[-]";
+		};
+		
+		clearBtn.onclick = function() {
+			debugLog = [];
+			updateDebugPanel();
+		};
+		
+		// Drag functionality
+		var dragging = false;
+		var dragX = 0.0;
+		var dragY = 0.0;
+		
+		header.onmousedown = function(e: Dynamic) {
+			dragging = true;
+			dragX = e.clientX - container.offsetLeft;
+			dragY = e.clientY - container.offsetTop;
+			header.style.cursor = "grabbing";
+		};
+		
+		js.Browser.document.onmousemove = function(e: Dynamic) {
+			if (dragging) {
+				container.style.left = Std.int(e.clientX - dragX) + "px";
+				container.style.top = Std.int(e.clientY - dragY) + "px";
+				container.style.right = "auto";
+			}
+		};
+		
+		js.Browser.document.onmouseup = function() {
+			dragging = false;
+			header.style.cursor = "move";
+		};
+		
+		// Start minimized
+		debugMinimized = false;
+		updateDebugPanel();
+		
+		return container;
+	}
+	
 	static function main() {
 		untyped if( js.node.Fs.accessSync == null ) js.node.Fs.accessSync = function(path) if( !(js.node.Fs : Dynamic).existsSync(path) ) throw path + " does not exists";
 		try {
 			inst = new Main();
+			createDebugPanel();
+			log("Main started");
+			// Open DevTools after a short delay
+			haxe.Timer.delay(function() {
+				try {
+					#if nwjs
+					js.Syntax.code("if (typeof nw !== 'undefined' && nw.Window && nw.Window.get) { nw.Window.get().showDevTools(); }");
+					#else
+					js.Syntax.code("if (typeof window !== 'undefined' && window.devtools && window.devtools.open) { window.devtools.open(); }");
+					#end
+					log("[DEBUG] DevTools opened");
+				} catch(e: Dynamic) {
+					log("[ERROR] Failed to open DevTools: " + Std.string(e));
+				}
+			}, 1000);
 		} catch( e : Dynamic ) {
-			js.Syntax.code("console.error('Main init error:', {0})", e);
+			log("[ERROR] Main init error: " + Std.string(e));
 		}
 		Reflect.setField(js.Browser.window, "_", inst);
 	}

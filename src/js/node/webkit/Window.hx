@@ -38,7 +38,13 @@ class Window {
 	public function restore(): Void {}
 	public function enterFullscreen(): Void {}
 	public function leaveFullscreen(): Void {}
-	public function showDevTools(?id: String, ?headless: Bool): Void {}
+	public function showDevTools(?id: String, ?headless: Bool): Void {
+		#if nwjs
+		js.Syntax.code("if (typeof nw !== 'undefined' && nw.Window && nw.Window.get) { nw.Window.get().showDevTools(); }");
+		#else
+		js.Syntax.code("debugger;");
+		#end
+	}
 	public function closeDevTools(): Void {}
 
 	public function on(event: String, callb: Event -> Void): Void {

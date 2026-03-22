@@ -82,21 +82,34 @@ class Model {
 			if( this.history.length > 100 || sdata.d.length * (this.history.length + this.redo.length) * 2 > 300<<20 ) this.history.shift();
 			curSavedData = sdata;
 		}
-		if( prefs.curFile == null )
+		if( prefs.curFile == null ) {
+			js.Browser.console.log("[DEBUG] Model.save: curFile is null, returning early");
 			return;
+		}
 		var tmp = Sys.getEnv("TMP");
 		if( tmp == null ) tmp = Sys.getEnv("TMPDIR");
 		var tmpFile = tmp+"/"+prefs.curFile.split("\\").join("/").split("/").pop()+".lock";
-		try sys.io.File.saveContent(tmpFile,"LOCKED by CDB") catch( e : Dynamic ) {};
+		js.Browser.console.log("[DEBUG] Model.save: saving to " + prefs.curFile);
+		try sys.io.File.saveContent(tmpFile,"LOCKED by CDB") catch( e : Dynamic ) {
+			js.Browser.console.error("[ERROR] Model.save: lock file failed: " + Std.string(e));
+		};
 		try {
 			sys.io.File.saveContent(prefs.curFile, sdata.d);
 		} catch( e : Dynamic ) {
+			js.Browser.console.error("[ERROR] Model.save: saveContent failed: " + Std.string(e) + ", retrying...");
 			// retry once after EBUSY
 			haxe.Timer.delay(function() {
-				sys.io.File.saveContent(prefs.curFile, sdata.d);
+				try {
+					sys.io.File.saveContent(prefs.curFile, sdata.d);
+					js.Browser.console.log("[DEBUG] Model.save: retry succeeded");
+				} catch(e2: Dynamic) {
+					js.Browser.console.error("[ERROR] Model.save: retry failed: " + Std.string(e2));
+				}
 			},500);
 		}
-		try sys.FileSystem.deleteFile(tmpFile) catch( e : Dynamic ) {};
+		try sys.FileSystem.deleteFile(tmpFile) catch( e : Dynamic ) {
+			js.Browser.console.error("[ERROR] Model.save: delete lock file failed: " + Std.string(e));
+		};
 	}
 
 	function saveImages() {
